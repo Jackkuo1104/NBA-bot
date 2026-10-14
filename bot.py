@@ -1,0 +1,805 @@
+"""
+NBA 即時比分 / 勝負結果 / 簽約交易 / 年度獎項 / 重大新聞 → Discord 機器人
+資料來源：ESPN NBA API（比分、球員異動、新聞、獎項，皆免費，不需要金鑰）
+Shams Charania 的新聞由 shams-bot 負責，這裡會自動排除，避免重複發文
+球隊、獎項清單都從 API 動態取得，球隊搬遷改名、新增獎項都不用改程式
+"""
+
+import os
+import re
+import json
+import time
+import asyncio
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+import aiohttp
+import discord
+from discord import app_commands
+from discord.ext import tasks
+from dotenv import load_dotenv
+
+# ===== 設定 =====
+load_dotenv()
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+_channel_id = (os.getenv("CHANNEL_ID") or "").strip()
+CHANNEL_ID = int(_channel_id) if _channel_id.isdigit() else 0
+CHECK_SECONDS = float(os.getenv("CHECK_SECONDS", "60"))
+# 只追蹤這些球隊的比分和異動（逗號分隔的 ESPN 縮寫，例如 LAL,GS,NY）；留空代表全部球隊
+FOLLOW_TEAMS = {t.strip().upper() for t in os.getenv("FOLLOW_TEAMS", "").split(",") if t.strip()}
+# 要推送的異動類型：trade 交易、sign 簽約/續約、claim 讓渡認領、waive 釋出、
+# option 合約選項、coach 教練/球團人事、gleague 下放/召回發展聯盟
+TX_TYPES = {t.strip().lower() for t in (os.getenv("TX_TYPES") or "trade,sign,claim").split(",")
+            if t.strip()}
+SKIP_MINOR_DEALS = os.getenv("SKIP_MINOR_DEALS", "true").strip().lower() == "true"
+# 要推送的 ESPN 新聞類型：HeadlineNews 是突發/重大新聞；可加 Story、Recap、Preview、Media
+NEWS_TYPES = {t.strip() for t in os.getenv("NEWS_TYPES", "HeadlineNews").split(",") if t.strip()}
+# 每幾分鐘檢查一次年度獎項
+AWARD_CHECK_MINUTES = float(os.getenv("AWARD_CHECK_MINUTES", "30"))
+
+ESPN_API = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"
+ESPN_CORE = "https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba"
+SHAMS_KEYWORD = "charania"  # 和 shams-bot 相同的判斷方式，含這個字的新聞交給 shams-bot
+STATE_FILE = "state.json"
+SEEN_LIMIT = 500  # 只保留最近的 ID，避免檔案無限變大
+TW = timezone(timedelta(hours=8))
+ET = ZoneInfo("America/New_York")  # 自動處理夏令/冬令時間
+REFRESH_SECONDS = 12 * 3600  # 球隊清單多久重新抓一次
+
+TEAMS = {  # 預設的 ESPN 球隊 ID → (縮寫, 中文隊名)；執行時會用 API 的最新球隊清單更新
+    "1": ("ATL", "老鷹"), "2": ("BOS", "塞爾提克"), "17": ("BKN", "籃網"), "30": ("CHA", "黃蜂"),
+    "4": ("CHI", "公牛"), "5": ("CLE", "騎士"), "6": ("DAL", "獨行俠"), "7": ("DEN", "金塊"),
+    "8": ("DET", "活塞"), "9": ("GS", "勇士"), "10": ("HOU", "火箭"), "11": ("IND", "溜馬"),
+    "12": ("LAC", "快艇"), "13": ("LAL", "湖人"), "29": ("MEM", "灰熊"), "14": ("MIA", "熱火"),
+    "15": ("MIL", "公鹿"), "16": ("MIN", "灰狼"), "3": ("NO", "鵜鶘"), "18": ("NY", "尼克"),
+    "25": ("OKC", "雷霆"), "19": ("ORL", "魔術"), "20": ("PHI", "76人"), "21": ("PHX", "太陽"),
+    "22": ("POR", "拓荒者"), "23": ("SAC", "國王"), "24": ("SA", "馬刺"), "28": ("TOR", "暴龍"),
+    "26": ("UTAH", "爵士"), "27": ("WSH", "巫師"),
+}
+# 目前的 NBA 球隊 ID → (縮寫, 顯示名稱)；新球隊沒有中文名時顯示英文隊名
+nba_teams: dict[str, tuple[str, str]] = dict(TEAMS)
+_teams_loaded_at = 0.0
+
+AWARD_ZH = {  # ESPN 獎項 ID → 中文名稱；不在這裡的獎項顯示英文名稱
+    "33": "年度最有價值球員 MVP", "39": "年度最佳防守球員", "35": "年度最佳新秀",
+    "40": "年度最佳第六人", "36": "年度進步最多球員", "297": "年度關鍵球員",
+    "43": "總冠軍賽 MVP", "218": "東區冠軍賽 MVP", "217": "西區冠軍賽 MVP",
+    "44": "年度最佳陣容（第一隊）", "45": "年度最佳陣容（第二隊）", "46": "年度最佳陣容（第三隊）",
+    "47": "年度最佳新秀陣容（第一隊）", "48": "年度最佳新秀陣容（第二隊）",
+    "49": "年度最佳防守陣容（第一隊）", "50": "年度最佳防守陣容（第二隊）",
+    "53": "明星賽 MVP", "77": "年度最佳隊友獎", "377": "NBA 盃 MVP", "378": "NBA 盃明星隊",
+}
+
+TX_KINDS = {  # 異動類型 → (標題, 顏色, 敘述開頭的英文動詞)
+    "trade": ("🔄 交易", 0x1E88E5, ("Acquired", "Traded")),
+    "sign": ("✍️ 簽約", 0x43A047, ("Signed", "Re-signed", "Agreed", "Extended", "Converted")),
+    "claim": ("📋 讓渡認領", 0x8E24AA, ("Claimed",)),
+    "waive": ("👋 釋出", 0x757575, ("Waived", "Released", "Bought")),
+    "option": ("📝 合約選項", 0x00897B, ("Exercised", "Declined", "Picked")),
+    "coach": ("👔 人事異動", 0xF9A825, ("Hired", "Fired", "Named", "Relieved", "Promoted")),
+    "gleague": ("🔁 發展聯盟", 0xFB8C00, ("Assigned", "Recalled")),
+}
+MINOR_DEAL = re.compile(r"two-way|exhibit 10", re.I)  # 雙向合約、Exhibit 10 這類邊緣合約
+
+# 季後賽（type 3）、附加賽（type 5）、明星賽、NBA 盃淘汰賽才發即時比分；其他比賽只在全部結束後發一則比分
+LIVE_SEASON_TYPES = {3, 5}
+LIVE_NOTES = re.compile(r"All-Star|Cup.*(Quarterfinal|Semifinal|Championship|Final)", re.I)
+
+# 這些狀態（延賽、暫停、取消）出現時另外通知
+NOTABLE_STATUS = ("DELAYED", "SUSPENDED", "POSTPONED", "CANCELED", "FORFEIT")
+CALLED_OFF = ("SUSPENDED", "POSTPONED", "CANCELED")
+LEADER_UNITS = {"points": "分", "rebounds": "籃板", "assists": "助攻"}
+
+
+# ===== 狀態紀錄 =====
+def load_state() -> dict | None:
+    """回傳上次的狀態；檔案不存在代表第一次執行，回傳 None"""
+    try:
+        with open(STATE_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
+    except json.JSONDecodeError:
+        print("⚠️ state.json 格式錯誤，當作第一次執行處理")
+        return None
+
+
+def save_state(state: dict) -> None:
+    for key in ("tx", "news"):
+        if key in state:
+            state[key] = state[key][-SEEN_LIMIT:]
+    with open(STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump(state, f, ensure_ascii=False, indent=2)
+
+
+# ===== API =====
+async def get_json(session: aiohttp.ClientSession, url: str, params: dict | None = None) -> dict:
+    async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+        resp.raise_for_status()
+        return await resp.json()
+
+
+async def fetch_games(session: aiohttp.ClientSession) -> list[dict]:
+    """美東時間昨天和今天的所有比賽，涵蓋跨午夜才結束的晚場"""
+    today = datetime.now(ET).date()
+    days = [today - timedelta(days=1), today]
+    results = await asyncio.gather(*(
+        get_json(session, f"{ESPN_API}/scoreboard", {"dates": d.strftime("%Y%m%d")}) for d in days))
+    games = []
+    for day, data in zip(days, results):
+        for game in data.get("events", []):
+            game["_date"] = str(day)  # 美東時間的比賽日期
+            games.append(game)
+    return games
+
+
+async def fetch_transactions(session: aiohttp.ClientSession, days: int = 3) -> list[dict]:
+    """最近幾天 NBA 球隊的異動，舊到新"""
+    data = await get_json(session, f"{ESPN_API}/transactions", {"limit": "100"})
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    txs = [t for t in data.get("transactions", []) if parse_time(t.get("date")) >= cutoff]
+    return list(reversed(txs))
+
+
+async def refresh_teams(session: aiohttp.ClientSession) -> None:
+    """用 API 的最新 NBA 球隊清單更新 nba_teams；失敗時沿用舊的"""
+    global _teams_loaded_at
+    if time.time() - _teams_loaded_at < REFRESH_SECONDS:
+        return
+    try:
+        data = await get_json(session, f"{ESPN_API}/teams")
+        entries = data["sports"][0]["leagues"][0]["teams"]
+    except Exception as e:
+        print(f"⚠️ 抓取球隊清單失敗，沿用舊資料：{e}")
+        return
+    teams = {}
+    for entry in entries:
+        t = entry.get("team") or {}
+        if t.get("id"):
+            fallback = (None, t.get("shortDisplayName") or t.get("displayName", "?"))
+            teams[str(t["id"])] = (t.get("abbreviation") or "?", TEAMS.get(str(t["id"]), fallback)[1])
+    if teams:
+        nba_teams.clear()
+        nba_teams.update(teams)
+        _teams_loaded_at = time.time()
+
+
+async def fetch_awards(session: aiohttp.ClientSession, season: int,
+                       limit: asyncio.Semaphore) -> list[dict]:
+    """某個球季的所有獎項（含得獎者）；該球季還沒有資料時回傳空清單"""
+    async with limit:
+        async with session.get(f"{ESPN_CORE}/seasons/{season}/awards", params={"limit": "100"},
+                               timeout=aiohttp.ClientTimeout(total=15)) as resp:
+            if resp.status == 404:
+                return []
+            resp.raise_for_status()
+            refs = [i["$ref"] for i in (await resp.json()).get("items", []) if i.get("$ref")]
+
+    async def fetch(ref: str) -> dict:
+        async with limit:
+            return await get_json(session, https(ref))
+
+    return list(await asyncio.gather(*(fetch(r) for r in refs)))
+
+
+def award_seasons() -> list[int]:
+    """ESPN 的球季以結束的年份命名（2025-26 球季 = 2026）；同時檢查上一季，接住季後才公布的獎項"""
+    now = datetime.now(ET)
+    season = now.year + 1 if now.month >= 8 else now.year
+    return [season - 1, season]
+
+
+async def fetch_news(session: aiohttp.ClientSession, limit: int = 50) -> list[dict]:
+    data = await get_json(session, f"{ESPN_API}/news", {"limit": str(limit)})
+    return data.get("articles", [])  # 新到舊
+
+
+# ===== 小工具 =====
+def https(url: str) -> str:
+    return url.replace("http://", "https://", 1)
+
+
+def parse_time(value: str | None) -> datetime:
+    try:
+        return datetime.fromisoformat((value or "").replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.min.replace(tzinfo=timezone.utc)
+
+
+def team_label(team: dict) -> str:
+    known = nba_teams.get(str(team.get("id")))
+    return f"{known[1]} {known[0]}" if known else team.get("displayName") or team.get("name", "?")
+
+
+def team_abbr(team: dict) -> str:
+    known = nba_teams.get(str(team.get("id")))
+    return known[0] if known else team.get("abbreviation") or team.get("name", "?")
+
+
+def team_name(team_id) -> str:
+    known = nba_teams.get(str(team_id)) or TEAMS.get(str(team_id))
+    return known[1] if known else ""
+
+
+def follows(*abbrs: str) -> bool:
+    return not FOLLOW_TEAMS or any(a in FOLLOW_TEAMS for a in abbrs)
+
+
+def competition(game: dict) -> dict:
+    return (game.get("competitions") or [{}])[0]
+
+
+def side(game: dict, home_away: str) -> dict:
+    return next((c for c in competition(game).get("competitors", [])
+                 if c.get("homeAway") == home_away), {"team": {}})
+
+
+def score(competitor: dict) -> int:
+    try:
+        return int(competitor.get("score") or 0)
+    except ValueError:
+        return 0
+
+
+def game_status(game: dict) -> tuple[str, str]:
+    """回傳 (pre / in / post, 狀態代碼例如 STATUS_HALFTIME)"""
+    t = (game.get("status") or {}).get("type") or {}
+    return t.get("state", ""), t.get("name", "")
+
+
+def is_called_off(game: dict) -> bool:
+    return any(w in game_status(game)[1] for w in CALLED_OFF)
+
+
+def is_special(game: dict) -> bool:
+    """明星賽這類非 NBA 球隊對戰的比賽（熱身賽對國外球隊除外）"""
+    if (game.get("season") or {}).get("type") == 1:
+        return False
+    return not all(str(c.get("team", {}).get("id")) in nba_teams
+                   for c in competition(game).get("competitors", []))
+
+
+def notes_text(game: dict) -> str:
+    return "｜".join(n.get("headline", "") for n in competition(game).get("notes") or []
+                    if n.get("headline"))
+
+
+def is_live_game(game: dict) -> bool:
+    if (game.get("season") or {}).get("type") in LIVE_SEASON_TYPES:
+        return True
+    return is_special(game) or bool(LIVE_NOTES.search(notes_text(game)))
+
+
+def period_name(n: int) -> str:
+    if n <= 4:
+        return f"第 {n} 節"
+    return "延長賽" if n == 5 else f"第 {n - 4} 次延長賽"
+
+
+def completed_periods(game: dict) -> int:
+    """已經打完幾節（含延長賽）"""
+    state, name = game_status(game)
+    period = (game.get("status") or {}).get("period") or 0
+    if state == "post" or name in ("STATUS_END_PERIOD", "STATUS_HALFTIME"):
+        return period
+    return max(period - 1, 0) if state == "in" else 0
+
+
+def clock_text(game: dict) -> str:
+    status = game.get("status") or {}
+    state, name = game_status(game)
+    period = status.get("period") or 0
+    if state != "in" or not period:
+        return ""
+    if name == "STATUS_HALFTIME":
+        return "中場休息"
+    if name == "STATUS_END_PERIOD":
+        return f"{period_name(period)}結束"
+    return f"{period_name(period)} 剩 {status.get('displayClock', '')}"
+
+
+def game_url(game: dict) -> str:
+    return f"https://www.espn.com/nba/game/_/gameId/{game['id']}"
+
+
+def score_title(game: dict) -> str:
+    away, home = side(game, "away"), side(game, "home")
+    return f"{team_label(away['team'])} {score(away)} : {score(home)} {team_label(home['team'])}"
+
+
+def series_text(game: dict) -> str:
+    summary = (competition(game).get("series") or {}).get("summary", "")
+    return "｜".join(p for p in (notes_text(game), summary) if p)
+
+
+def linescore_table(game: dict) -> str:
+    away, home = side(game, "away"), side(game, "home")
+    n = max(len(away.get("linescores") or []), len(home.get("linescores") or []))
+    if not n:
+        return ""
+    labels = [str(i) if i <= 4 else ("OT" if i == 5 else f"{i - 4}OT") for i in range(1, n + 1)]
+
+    def row(c: dict) -> str:
+        vals = [str(x.get("displayValue", "")) for x in c.get("linescores") or []]
+        vals += [""] * (n - len(vals))
+        cells = " ".join(f"{v:>3}" for v in vals)
+        return f"{team_abbr(c['team']):<5}{cells} |{score(c):>4}"
+
+    header = "     " + " ".join(f"{l:>3}" for l in labels) + " |   T"
+    return "```\n" + "\n".join([header, row(away), row(home)]) + "\n```"
+
+
+def leaders_line(competitor: dict) -> str:
+    parts = []
+    for cat in competitor.get("leaders") or []:
+        unit = LEADER_UNITS.get(cat.get("name"))
+        top = (cat.get("leaders") or [{}])[0]
+        name = (top.get("athlete") or {}).get("shortName")
+        if unit and name:
+            parts.append(f"{name} {top.get('displayValue', '')} {unit}")
+    if not parts:
+        return ""
+    return f"**{team_label(competitor['team'])}**：" + "｜".join(parts)
+
+
+def game_embed(game: dict, title: str, lines: list[str], color: int) -> discord.Embed:
+    embed = discord.Embed(title=title[:256], url=game_url(game),
+                          description="\n".join(l for l in lines if l)[:4000], color=color)
+    series = series_text(game)
+    embed.set_footer(text=f"NBA｜{series}"[:2048] if series else "NBA")
+    embed.timestamp = datetime.now(timezone.utc)
+    return embed
+
+
+# ===== 訊息內容 =====
+def start_message(game: dict) -> tuple[str, discord.Embed]:
+    away, home = side(game, "away"), side(game, "home")
+    venue = (competition(game).get("venue") or {}).get("fullName", "")
+    title = f"{team_label(away['team'])} @ {team_label(home['team'])}"
+    return "🏀 **比賽開始**", game_embed(game, title, [f"📍 {venue}" if venue else ""], 0x1D428A)
+
+
+def period_message(game: dict) -> tuple[str, discord.Embed]:
+    n = completed_periods(game)
+    label = "中場" if n == 2 else f"{period_name(n)}結束"
+    return f"⏱️ **{label}**", game_embed(game, score_title(game), [linescore_table(game)], 0xC8102E)
+
+
+def final_message(game: dict) -> tuple[str, discord.Embed]:
+    away, home = side(game, "away"), side(game, "home")
+    winner = away if away.get("winner") else home if home.get("winner") else None
+    periods = (game.get("status") or {}).get("period") or 0
+    overtime = f"（{period_name(periods)}）" if periods > 4 else ""
+    lines = [f"🏆 **{team_label(winner['team'])}** 獲勝{overtime}" if winner else "🤝 平手",
+             leaders_line(away), leaders_line(home), linescore_table(game)]
+    recap = (competition(game).get("headlines") or [{}])[0].get("shortLinkText")
+    if recap:
+        lines.append(f"📝 {recap}")
+    return "🏁 **終場**", game_embed(game, score_title(game), lines, 0xFFB81C)
+
+
+def status_message(game: dict) -> tuple[str, discord.Embed]:
+    t = (game.get("status") or {}).get("type") or {}
+    lines = [f"狀態：{t.get('detail') or t.get('description', '')}", clock_text(game)]
+    return "⏸️ **比賽狀態更新**", game_embed(game, score_title(game), lines, 0x757575)
+
+
+def tx_kind(tx: dict) -> str:
+    first = (tx.get("description") or "").split(" ", 1)[0]
+    return next((k for k, (_, _, verbs) in TX_KINDS.items() if first in verbs), "other")
+
+
+def tx_id(tx: dict) -> str:
+    return f"{(tx.get('date') or '')[:10]}|{tx.get('team', {}).get('id')}|{tx.get('description', '')}"
+
+
+def team_logo(team: dict) -> str | None:
+    logos = team.get("logos") or []
+    return logos[0].get("href") if logos else None
+
+
+def tx_mentions(a: dict, b: dict) -> bool:
+    """a 的敘述有沒有提到 b 的球隊（用來把交易雙方合併成一則）"""
+    team = b.get("team") or {}
+    words = [w for w in (team.get("name"), team.get("location"), team.get("displayName"))
+             if w and len(w) > 2]
+    return any(re.search(rf"\b{re.escape(w)}\b", a.get("description", "")) for w in words)
+
+
+def group_trades(txs: list[dict]) -> list[list[dict]]:
+    """同一天、互相提到對方球隊的交易紀錄合併成一組，其他異動各自一組"""
+    groups: list[list[dict]] = []
+    for tx in txs:
+        if tx_kind(tx) == "trade":
+            match = next((g for g in groups if tx_kind(g[0]) == "trade" and g[0].get("date") == tx.get("date")
+                          and any(tx_mentions(tx, x) or tx_mentions(x, tx) for x in g)), None)
+            if match:
+                match.append(tx)
+                continue
+        groups.append([tx])
+    return groups
+
+
+def tx_message(group: list[dict]) -> tuple[str, discord.Embed]:
+    label, color, _ = TX_KINDS.get(tx_kind(group[0]), ("📰 異動", 0x757575, ()))
+    if len(group) == 1:
+        description = group[0].get("description", "")
+    else:
+        description = "\n".join(f"**{team_name(t.get('team', {}).get('id')) or t.get('team', {}).get('displayName', '')}**："
+                                f"{t.get('description', '')}" for t in group)
+    embed = discord.Embed(title=label, description=description[:4000], color=color)
+    team = group[0].get("team") or {}
+    if len(group) == 1 and team.get("id"):
+        embed.set_author(name=team_name(team["id"]) or team.get("displayName", ""), icon_url=team_logo(team))
+    embed.set_footer(text=f"NBA 異動｜{(group[0].get('date') or '')[:10]}")
+    return "📰 **NBA 球員異動**", embed
+
+
+def wanted_tx(tx: dict) -> bool:
+    if tx_kind(tx) not in TX_TYPES or not follows(tx.get("team", {}).get("abbreviation", "")):
+        return False
+    return not (SKIP_MINOR_DEALS and MINOR_DEAL.search(tx.get("description", "")))
+
+
+def season_label(season: int) -> str:
+    return f"{season - 1}-{str(season)[2:]}"
+
+
+def ref_id(obj: dict | None, kind: str) -> str:
+    m = re.search(rf"/{kind}/(\d+)", (obj or {}).get("$ref", ""))
+    return m.group(1) if m else ""
+
+
+def winner_ref(w: dict) -> str | None:
+    return next((w[k]["$ref"] for k in ("athlete", "coach") if (w.get(k) or {}).get("$ref")), None)
+
+
+def winner_key(season: int, award: dict, w: dict) -> str:
+    person = ref_id(w.get("athlete"), "athletes") or ref_id(w.get("coach"), "coaches")
+    return f"{season}:{award.get('id')}:{person}:{ref_id(w.get('team'), 'teams')}"
+
+
+def person_text(person: dict, team_id: str) -> str:
+    name = person.get("displayName") or " ".join(
+        p for p in (person.get("firstName"), person.get("lastName")) if p) or "?"
+    pos = (person.get("position") or {}).get("abbreviation", "")
+    text = " ".join(p for p in (pos, name) if p)
+    team = team_name(team_id)
+    return f"{text}（{team}）" if team else text
+
+
+def award_message(award: dict, season: int,
+                  winners: list[tuple[dict, str]]) -> tuple[str, discord.Embed]:
+    """winners：[(球員/教練資料, 球隊 ID)]"""
+    name = AWARD_ZH.get(str(award.get("id"))) or award.get("name", "")
+    embed = discord.Embed(title=f"{season_label(season)} {name}"[:256],
+                          description="\n".join(f"• {person_text(p, t)}" for p, t in winners)[:4000],
+                          color=0xFFD700)
+    links = award.get("links") or []
+    if links and links[0].get("href"):
+        embed.url = links[0]["href"]
+    headshot = (winners[0][0].get("headshot") or {}).get("href") if len(winners) == 1 else None
+    if headshot:
+        embed.set_thumbnail(url=headshot)
+    embed.set_footer(text=f"NBA 獎項｜{award.get('name', '')}"[:2048])
+    embed.timestamp = datetime.now(timezone.utc)
+    return "🏆 **NBA 獎項揭曉**", embed
+
+
+def is_shams(article: dict) -> bool:
+    text = " ".join(str(article.get(k) or "") for k in ("byline", "headline", "description"))
+    return SHAMS_KEYWORD in text.lower()
+
+
+def wanted_news(article: dict) -> bool:
+    return article.get("type") in NEWS_TYPES and not is_shams(article)
+
+
+def news_embed(article: dict) -> discord.Embed:
+    embed = discord.Embed(
+        title=(article.get("headline") or "（無標題）")[:256],
+        url=article.get("links", {}).get("web", {}).get("href"),
+        description=(article.get("description") or "")[:4000],
+        color=0xC8102E,
+    )
+    if article.get("byline"):
+        embed.set_author(name=article["byline"][:256])
+    images = article.get("images") or []
+    if images and images[0].get("url"):
+        embed.set_image(url=images[0]["url"])
+    if article.get("published"):
+        published = parse_time(article["published"])
+        if published.year > 1:
+            embed.timestamp = published
+    embed.set_footer(text="ESPN NBA")
+    return embed
+
+
+def article_id(article: dict) -> str:
+    return str(article.get("id") or article.get("links", {}).get("web", {}).get("href", ""))
+
+
+def final_line(game: dict) -> str:
+    away, home = side(game, "away"), side(game, "home")
+    periods = (game.get("status") or {}).get("period") or 0
+    overtime = f"（{period_name(periods)}）" if periods > 4 else ""
+    return (f"{team_label(away['team'])} **{score(away)} : {score(home)}** "
+            f"{team_label(home['team'])}{overtime}")
+
+
+def day_done_message(date: str, games: list[dict]) -> tuple[str, discord.Embed]:
+    finished = [g for g in games if not is_called_off(g)]
+    lines = [final_line(g) for g in finished]
+    if len(finished) < len(games):
+        lines.append(f"另有 {len(games) - len(finished)} 場延賽或取消")
+    lines.append("👉 點上方標題查看完整比分")
+    embed = discord.Embed(title=f"NBA 全部比分｜{date}",
+                          url=f"https://www.espn.com/nba/scoreboard/_/date/{date.replace('-', '')}",
+                          description="\n".join(lines)[:4000], color=0x1D428A)
+    embed.set_footer(text="NBA")
+    embed.timestamp = datetime.now(timezone.utc)
+    return "📋 **今日 NBA 比賽全部結束**", embed
+
+
+def day_done_updates(games: list[dict], state: dict, initial: bool) -> list:
+    """例行賽、熱身賽的日子，當天所有比賽都結束（或延賽）後，發一則整天的比分"""
+    by_date: dict[str, list[dict]] = {}
+    for game in games:
+        by_date.setdefault(game["_date"], []).append(game)
+    first_time = "days_done" not in state
+    done = state.setdefault("days_done", [])
+    messages = []
+    for date, day_games in sorted(by_date.items()):
+        regular = [g for g in day_games if not is_live_game(g)]
+        if not regular or date in done or all(is_called_off(g) for g in regular):
+            continue
+        if not all(game_status(g)[0] == "post" or is_called_off(g) for g in regular):
+            continue
+        done.append(date)
+        if not (initial or first_time):
+            messages.append(day_done_message(date, regular))
+    state["days_done"] = done[-10:]
+    return messages
+
+
+# ===== 比對新舊資料，產生要發送的訊息 =====
+async def game_updates(session: aiohttp.ClientSession, state: dict, initial: bool) -> list:
+    games = await fetch_games(session)
+    messages = day_done_updates(games, state, initial)
+    new_games = {}
+    for game in games:
+        status, name = game_status(game)
+        prev = state["games"].get(game["id"])
+        cur = {"state": status, "status": name, "periods": completed_periods(game)}
+        new_games[game["id"]] = cur
+        # 新出現的比賽只記錄不發文（第一次執行，或機器人關掉一段時間後）
+        if prev is None or initial:
+            continue
+        # 例行賽、熱身賽不發即時比分，改成全部結束後發一次整天比分（見 day_done_updates）
+        if not is_live_game(game):
+            continue
+        if not is_special(game) and not follows(  # 明星賽不受 FOLLOW_TEAMS 限制
+                team_abbr(side(game, "away")["team"]), team_abbr(side(game, "home")["team"])):
+            continue
+
+        notable = any(w in name for w in NOTABLE_STATUS)
+        if status == "post":
+            if prev["state"] != "post":
+                messages.append(status_message(game) if notable else final_message(game))
+            continue
+        if name != prev["status"] and notable:
+            messages.append(status_message(game))
+        if status != "in":
+            continue
+        if prev["state"] == "pre":
+            messages.append(start_message(game))
+        if cur["periods"] > prev["periods"]:  # 漏掉好幾節時只發最新一節
+            messages.append(period_message(game))
+    state["games"] = new_games
+    return messages
+
+
+async def tx_updates(session: aiohttp.ClientSession, state: dict, initial: bool) -> list:
+    seen = set(state["tx"])
+    new_txs = [t for t in await fetch_transactions(session)
+               if wanted_tx(t) and tx_id(t) not in seen]
+    state["tx"] += [tx_id(t) for t in new_txs]
+    if initial:
+        return []
+    return [tx_message(group) for group in group_trades(new_txs)]
+
+
+async def news_updates(session: aiohttp.ClientSession, state: dict, initial: bool) -> list:
+    seen = set(state["news"])
+    new_articles = [a for a in await fetch_news(session)
+                    if wanted_news(a) and article_id(a) not in seen]
+    new_articles.reverse()  # 舊的先發
+    state["news"] += [article_id(a) for a in new_articles]
+    if initial:
+        return []
+    return [("🚨 **NBA 重大消息**", news_embed(a)) for a in new_articles]
+
+
+async def award_updates(session: aiohttp.ClientSession, state: dict, initial: bool) -> list:
+    if not initial and time.time() - state.get("awards_checked", 0) < AWARD_CHECK_MINUTES * 60:
+        return []
+    limit = asyncio.Semaphore(8)  # 同時最多 8 個請求，避免對 ESPN 太兇
+    seasons = award_seasons()
+    results = await asyncio.gather(*(fetch_awards(session, s, limit) for s in seasons))
+    seen = set(state["awards"])
+    keys, new = [], []
+    for season, awards in zip(seasons, results):
+        for award in awards:
+            winners = [w for w in award.get("winners") or [] if winner_ref(w)]
+            keys += [winner_key(season, award, w) for w in winners]
+            fresh = [w for w in winners if winner_key(season, award, w) not in seen]
+            if fresh:
+                new.append((season, award, fresh))
+    state["awards"] = keys  # 只保留目前檢查的球季，檔案不會一直變大
+    state["awards_checked"] = time.time()
+    if initial or not new:
+        return []
+
+    async def person(w: dict) -> tuple[dict, str]:
+        async with limit:
+            try:
+                data = await get_json(session, https(winner_ref(w)))
+            except Exception as e:
+                print(f"⚠️ 抓取得獎者資料失敗：{e}")
+                data = {}
+        return data, ref_id(w.get("team"), "teams")
+
+    messages = []
+    for season, award, fresh in new:
+        winners = list(await asyncio.gather(*(person(w) for w in fresh)))
+        messages.append(award_message(award, season, winners))
+    return messages
+
+
+async def collect_updates(session: aiohttp.ClientSession) -> tuple[list, dict]:
+    """回傳 (要發送的 [(文字, embed)], 更新後的狀態)；呼叫端發完訊息後要 save_state"""
+    state = load_state() or {}
+    await refresh_teams(session)
+    messages = []
+    for key, name, check, empty in (("games", "比分", game_updates, {}),
+                                    ("tx", "異動", tx_updates, []),
+                                    ("news", "新聞", news_updates, []),
+                                    ("awards", "獎項", award_updates, [])):
+        # 第一次抓到某個來源時只記錄現有資料，不發文，避免洗版
+        initial = key not in state
+        state.setdefault(key, empty)
+        try:
+            messages += await check(session, state, initial)
+        except Exception as e:
+            print(f"⚠️ 抓取{name}失敗：{e}")
+            if initial:
+                del state[key]  # 下次成功時再初始化
+            continue
+        if initial:
+            print(f"初始化完成，已記錄 {len(state[key])} 筆{name}")
+    return messages, state
+
+
+# ===== Discord 機器人 =====
+class NBABot(discord.Client):
+    def __init__(self):
+        super().__init__(intents=discord.Intents.default())
+        self.tree = app_commands.CommandTree(self)
+        self.session = None
+
+    async def setup_hook(self):
+        self.session = aiohttp.ClientSession()
+        await self.tree.sync()
+        self.check_updates.change_interval(seconds=CHECK_SECONDS)
+        self.check_updates.start()
+
+    async def close(self):
+        if self.session:
+            await self.session.close()
+        await super().close()
+
+    async def on_ready(self):
+        print(f"✅ 已登入：{self.user}，每 {CHECK_SECONDS:g} 秒檢查一次 NBA 比分、異動和新聞")
+
+    @tasks.loop(seconds=60)
+    async def check_updates(self):
+        messages, state = await collect_updates(self.session)
+        channel = self.get_channel(CHANNEL_ID)
+        if messages and channel is None:
+            print("⚠️ 找不到頻道，請確認 CHANNEL_ID 和機器人權限")
+        elif channel is not None:
+            for content, embed in messages:
+                try:
+                    await channel.send(content=content, embed=embed)
+                    print(f"已發送：{content} {embed.title}")
+                except discord.HTTPException as e:
+                    print(f"⚠️ 發送失敗：{e}")
+        save_state(state)
+
+    @check_updates.before_loop
+    async def before_check(self):
+        await self.wait_until_ready()
+
+
+bot = NBABot()
+
+
+def scoreboard_line(game: dict) -> str:
+    away, home = side(game, "away"), side(game, "home")
+    status, _ = game_status(game)
+    if status == "pre":
+        start = parse_time(game.get("date")).astimezone(TW)
+        return (f"🕒 {team_label(away['team'])} @ {team_label(home['team'])}"
+                f"｜台灣時間 {start:%m/%d %H:%M}")
+    if status == "post":
+        detail = ((game.get("status") or {}).get("type") or {}).get("shortDetail", "")
+        return f"🏁 {final_line(game)}" + (f"｜{detail}" if is_called_off(game) else "")
+    return f"🔴 {final_line(game)}｜{clock_text(game)}"
+
+
+# 指令名稱刻意避開 shams-bot 的 /shams、/nba
+@bot.tree.command(name="score", description="查看今天的 NBA 比分")
+async def score_command(interaction: discord.Interaction):
+    await interaction.response.defer()
+    try:
+        games = await fetch_games(bot.session)
+    except Exception as e:
+        await interaction.followup.send(f"⚠️ 抓取比分失敗：{e}")
+        return
+    today = str(datetime.now(ET).date())
+    games = [g for g in games if g["_date"] == today]
+    if not games:
+        await interaction.followup.send("今天（美國時間）沒有 NBA 比賽。")
+        return
+    embed = discord.Embed(title=f"NBA 比分｜{today}",
+                          description="\n".join(scoreboard_line(g) for g in games)[:4000],
+                          color=0x1D428A)
+    await interaction.followup.send(embed=embed)
+
+
+@bot.tree.command(name="news", description="查看最近的 NBA 重大新聞（不含 Shams）")
+@app_commands.describe(count="要顯示幾則（1-5）")
+async def news_command(interaction: discord.Interaction,
+                       count: app_commands.Range[int, 1, 5] = 3):
+    await interaction.response.defer()
+    try:
+        articles = [a for a in await fetch_news(bot.session) if wanted_news(a)]
+    except Exception as e:
+        await interaction.followup.send(f"⚠️ 抓取 ESPN 新聞失敗：{e}")
+        return
+    if not articles:
+        await interaction.followup.send("ESPN 最近 50 則新聞裡沒有重大消息。")
+        return
+    await interaction.followup.send(embeds=[news_embed(a) for a in articles[:count]])
+
+
+@bot.tree.command(name="moves", description="查看最近的 NBA 簽約、交易")
+@app_commands.describe(days="往回查幾天（1-14）")
+async def moves_command(interaction: discord.Interaction,
+                        days: app_commands.Range[int, 1, 14] = 3):
+    await interaction.response.defer()
+    try:
+        txs = [t for t in await fetch_transactions(bot.session, days) if wanted_tx(t)]
+    except Exception as e:
+        await interaction.followup.send(f"⚠️ 抓取 NBA 異動失敗：{e}")
+        return
+    if not txs:
+        await interaction.followup.send(f"最近 {days} 天沒有簽約或交易。")
+        return
+    lines = [f"{TX_KINDS.get(tx_kind(t), ('•',))[0]}｜{(t.get('date') or '')[:10]}｜"
+             f"{team_abbr(t.get('team', {}))}：{t.get('description', '')}" for t in reversed(txs)]
+    text = ""
+    for line in lines:  # 新的在上面，塞到 embed 上限為止
+        if len(text) + len(line) > 3900:
+            break
+        text += line + "\n"
+    embed = discord.Embed(title=f"NBA 簽約 / 交易（最近 {days} 天）", description=text, color=0x1E88E5)
+    await interaction.followup.send(embed=embed)
+
+
+if __name__ == "__main__":
+    missing = [k for k, v in {"DISCORD_TOKEN": DISCORD_TOKEN, "CHANNEL_ID": CHANNEL_ID}.items()
+               if not v]
+    if missing:
+        raise SystemExit(f"請先在 .env 設定：{', '.join(missing)}（CHANNEL_ID 必須是數字）")
+    bot.run(DISCORD_TOKEN)
