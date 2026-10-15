@@ -36,9 +36,9 @@
       "periods": 4
     },
     "401898722": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401901825": {
       "state": "in",
@@ -48,16 +48,16 @@
     "401908942": {
       "state": "in",
       "status": "STATUS_END_PERIOD",
-      "periods": 3
+      "periods": 4
     },
     "401914125": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401918011": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     }
   },
@@ -134,10 +134,10 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1792029317.4871583,
+  "awards_checked": 1792032090.8241153,
   "shams": [
     "50176173"
   ],
   "honors": [],
-  "honors_checked": 1792029317.658961
+  "honors_checked": 1792032091.0943172
 }
