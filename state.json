@@ -57,7 +57,7 @@
     },
     "401918011": {
       "state": "in",
-      "status": "STATUS_END_PERIOD",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 1
     }
   },
@@ -134,10 +134,10 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1792032090.8241153,
+  "awards_checked": 1792034125.3252199,
   "shams": [
     "50176173"
   ],
   "honors": [],
-  "honors_checked": 1792032091.0943172
+  "honors_checked": 1792034125.4095156
 }
