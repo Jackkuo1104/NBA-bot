@@ -5,6 +5,7 @@ Shams Charania 的新聞另外以「Shams 最新消息」發送，一般新聞�
 球隊、獎項清單都從 API 動態取得，球隊搬遷改名、新增獎項都不用改程式
 """
 
+import io
 import os
 import re
 import json
@@ -18,6 +19,11 @@ import discord
 from discord import app_commands
 from discord.ext import tasks
 from dotenv import load_dotenv
+
+try:  # 畫季後賽對戰圖用（需要 Pillow）；沒裝的話季後賽戰果只發文字
+    import bracket
+except ImportError:
+    bracket = None
 
 # ===== 設定 =====
 load_dotenv()
@@ -911,6 +917,9 @@ def day_done_updates(games: list[dict], state: dict, initial: bool) -> list:
     return messages
 
 
+SEASON_STATE_VERSION = 3  #球季狀態加了新項目時調高，舊狀態會重新初始化一次（不發文）
+
+
 def season_type(game: dict) -> int:
     return (game.get("season") or {}).get("type") or 0
 
@@ -922,15 +931,25 @@ def is_title_clincher(game: dict) -> bool:
             and bool((competition(game).get("series") or {}).get("completed")))
 
 
-def season_open_message(season: int, games: list[dict]) -> tuple[str, discord.Embed]:
-    lines = ["例行賽正式開打！今天的比賽："]
+def season_start_message(content: str, title: str, intro: str, games: list[dict],
+                         color: int) -> tuple[str, discord.Embed]:
+    lines = [f"{intro}今天的比賽："]
     lines += [f"• {team_label(side(g, 'away')['team'])} @ {team_label(side(g, 'home')['team'])}" for g in games]
-    embed = discord.Embed(title=f"NBA {season_label(season)} 球季開幕",
-                          url="https://www.espn.com/nba/schedule",
-                          description="\n".join(lines)[:4000], color=0x1D428A)
+    embed = discord.Embed(title=title, url="https://www.espn.com/nba/schedule",
+                          description="\n".join(lines)[:4000], color=color)
     embed.set_footer(text="NBA")
     embed.timestamp = datetime.now(timezone.utc)
-    return "🎉 **NBA 開季**", embed
+    return content, embed
+
+
+def first_started(games: list[dict], types: set[int]) -> tuple[int, list[dict]]:
+    """這幾種賽事裡已經開打的第一天：回傳 (球季年份, 那天這幾種賽事的所有比賽)"""
+    started = [g for g in games if season_type(g) in types and game_status(g)[0] in ("in", "post")]
+    if not started:
+        return 0, []
+    day = started[0]["_date"]
+    return ((started[0].get("season") or {}).get("year") or 0,
+            [g for g in games if g["_date"] == day and season_type(g) in types])
 
 
 def season_end_message(season: int, game: dict) -> tuple[str, discord.Embed]:
@@ -951,30 +970,280 @@ def season_end_message(season: int, game: dict) -> tuple[str, discord.Embed]:
     return "🏖️ **NBA 休賽季開始**", embed
 
 
-def season_updates(games: list[dict], state: dict, initial: bool) -> list:
-    """例行賽第一場開打時發「開季」，總冠軍賽打完時發「休賽季開始」"""
-    first_time = "season" not in state
-    s = state.setdefault("season", {})
-    if first_time:  # 第一次執行：已經開打的球季當作發過了，避免季中才裝就發開季
-        year, kind = league_season.get("year"), (league_season.get("type") or {}).get("type") or 0
-        if year and kind >= 2:
-            s["opened"] = year
+STANDINGS_URL = "https://site.api.espn.com/apis/v2/sports/basketball/nba/standings"
+REG_END_MONTHS = (3, 4, 5)  # 例行賽在 4 月打完；這幾個月才檢查是不是最後一天
+REG_END_CHECK_SECONDS = 30 * 60
+
+
+async def fetch_standings(session: aiohttp.ClientSession, season: int) -> list[dict]:
+    """[{conf: East/West, teams: [{id, abbr, logo, seed, wins, losses}...]}]，依種子序排好"""
+    data = await get_json(session, STANDINGS_URL, {"season": str(season)})
+    confs = []
+    for child in data.get("children") or []:
+        teams = []
+        for e in (child.get("standings") or {}).get("entries") or []:
+            st = {s.get("name"): s.get("value") for s in e.get("stats") or []}
+            t = e.get("team") or {}
+            teams.append({"id": str(t.get("id")), "abbr": t.get("abbreviation", ""),
+                          "logo": ((t.get("logos") or [{}])[0]).get("href"),
+                          "seed": int(st.get("playoffSeed") or 99),
+                          "wins": int(st.get("wins") or 0), "losses": int(st.get("losses") or 0)})
+        confs.append({"conf": "East" if "East" in child.get("name", "") else "West",
+                      "teams": sorted(teams, key=lambda t: t["seed"])})
+    return sorted(confs, key=lambda c: c["conf"])  # 東區在前
+
+
+async def regular_season_over(session: aiohttp.ClientSession, season: int) -> list[dict] | None:
+    """例行賽全部打完就回傳最終戰績，還沒打完回傳 None"""
+    confs = await fetch_standings(session, season)
+    teams = [t for c in confs for t in c["teams"]]
+    if len(teams) < 30 or len({t["wins"] + t["losses"] for t in teams}) != 1:
+        return None  # 還有球隊場數不一樣
+    sched = await get_json(session, f"{ESPN_API}/teams/{teams[0]['id']}/schedule",
+                           {"season": str(season), "seasontype": "2"})
+    if any(not ((competition(e).get("status") or {}).get("type") or {}).get("completed")
+           for e in sched.get("events") or []):
+        return None
+    return confs
+
+
+def standings_message(season: int, confs: list[dict]) -> tuple[str, discord.Embed]:
+    lines = ["例行賽全部打完！最終排名：", "✅ 直接晉級季後賽（1–6 名）　🎟️ 打附加賽（7–10 名）"]
+    for c in confs:
+        lines += ["", f"**{'東區' if c['conf'] == 'East' else '西區'}**"]
+        for t in c["teams"]:
+            mark = " ✅" if t["seed"] <= 6 else " 🎟️" if t["seed"] <= 10 else ""
+            lines.append(f"{t['seed']}. {team_name(t['id'])} {t['abbr']}　{t['wins']}-{t['losses']}{mark}")
+    embed = discord.Embed(title=f"NBA {season_label(season)} 例行賽結束", url="https://www.espn.com/nba/standings",
+                          description="\n".join(lines)[:4000], color=0x1D428A)
+    embed.set_footer(text="NBA")
+    embed.timestamp = datetime.now(timezone.utc)
+    return "🏁 **NBA 例行賽結束**", embed
+
+
+# ----- 季後賽每天的戰果和對戰圖 -----
+PLAYOFF_ROUNDS = (("NBA Finals", 3, "總冠軍賽"), ("1st Round", 0, "第一輪"),
+                  ("Semifinals", 1, "準決賽"), ("Finals", 2, "冠軍賽"))
+FIRST_ROUND_SLOT = {1: 0, 4: 1, 3: 2, 2: 3}  # 第一輪依高種子排位置：1v8、4v5、3v6、2v7
+PLAYOFF_DAY_DELAY = 10 * 60  # 當天比賽全部打完後，等 10 分鐘再發戰果
+
+
+def playoff_round(headline: str) -> tuple[str, int, str] | None:
+    """'East Semifinals - Game 3' → ('East', 1, '東區準決賽 第 3 戰')"""
+    conf = "East" if headline.startswith("East") else "West" if headline.startswith("West") else ""
+    conf_zh = {"East": "東區", "West": "西區"}.get(conf, "")
+    game = re.search(r"Game (\d+)", headline)
+    suffix = f" 第 {game[1]} 戰" if game else ""
+    if "Play-In" in headline:
+        conf = "East" if "East" in headline else "West"
+        return conf, -1, f"{'東區' if conf == 'East' else '西區'}附加賽"
+    for key, n, name in PLAYOFF_ROUNDS:
+        if key in headline:
+            return conf, n, f"{conf_zh}{name}{suffix}"
+    return None
+
+
+def series_caption(names: dict, wins: dict, need: int, final: bool) -> str:
+    """{id: 中文隊名}, {id: 勝場} → 「勇士 晉級 4-1」「勇士 領先 2-1」「系列賽 1-1 平手」"""
+    (a, wa), (b, wb) = sorted(wins.items(), key=lambda x: -x[1])[:2]
+    if wa >= need:
+        return f"{names.get(a, '')} {'奪冠' if final else '晉級'} {wa}-{wb}"
+    if wa == wb:
+        return "尚未開打" if wa == 0 else f"系列賽 {wa}-{wb} 平手"
+    return f"{names.get(a, '')} 領先 {wa}-{wb}"
+
+
+def game_series_text(game: dict) -> str:
+    sr = competition(game).get("series") or {}
+    wins = {str(c.get("id")): c.get("wins") or 0 for c in sr.get("competitors") or []}
+    if len(wins) != 2:
+        return ""
+    return series_caption({i: team_name(i) for i in wins}, wins, 4, notes_text(game).startswith("NBA Finals"))
+
+
+async def playoff_series(session: aiohttp.ClientSession, season: int, confs: list[dict]) -> list[dict]:
+    """從前 10 名球隊的季後賽賽程整理出所有系列賽：[{conf, round, teams, wins}]"""
+    ids = [t["id"] for c in confs for t in c["teams"] if t["seed"] <= 10]
+    scheds = await asyncio.gather(*(get_json(session, f"{ESPN_API}/teams/{i}/schedule",
+                                             {"season": str(season), "seasontype": "3"}) for i in ids))
+    events = {e["id"]: e for s in scheds for e in s.get("events") or []}
+    series = {}
+    for e in events.values():
+        rnd = playoff_round(notes_text(e))
+        comp = competition(e)
+        teams = [str((c.get("team") or {}).get("id")) for c in comp.get("competitors") or []]
+        if not rnd or rnd[1] < 0 or len(teams) != 2:
+            continue
+        sr = series.setdefault((rnd[1], frozenset(teams)),
+                               {"conf": rnd[0], "round": rnd[1], "teams": teams, "wins": dict.fromkeys(teams, 0)})
+        if ((comp.get("status") or {}).get("type") or {}).get("completed"):
+            for c in comp.get("competitors") or []:
+                if c.get("winner"):
+                    sr["wins"][str((c.get("team") or {}).get("id"))] += 1
+    return list(series.values())
+
+
+async def bracket_image(session: aiohttp.ClientSession, season: int, date: str) -> bytes:
+    confs = await fetch_standings(session, season)
+    series = await playoff_series(session, season, confs)
+    info = {t["id"]: t for c in confs for t in c["teams"]}
+    logos = await bracket.fetch_logos(session, {i: t["logo"] for i, t in info.items()
+                                                if t["logo"] and any(i in s["teams"] for s in series)})
+    font = await bracket.ensure_font(session)
+
+    def winner(sr: dict | None, need: int = 4) -> str | None:
+        return next((i for i, w in sr["wins"].items() if w >= need), None) if sr else None
+
+    def box(sr: dict | None, feeders: list[str | None] | None = None, seeds: bool = False,
+            final: bool = False) -> bracket.Box:
+        if not sr:  # 還沒排出對戰：放已經晉級的球隊，其他待定
+            return bracket.Box([bracket.Team(info[i]["abbr"], logos.get(i)) if i else bracket.Team()
+                                for i in (feeders or [None, None])])
+        teams = sorted(sr["teams"], key=lambda i: info.get(i, {}).get("seed", 99))
+        if final:  # 總冠軍賽：西區冠軍在上
+            teams = sorted(sr["teams"], key=lambda i: next((c["conf"] != "West" for c in confs
+                                                            if any(t["id"] == i for t in c["teams"])), True))
+        w = winner(sr)
+        top_seed = info.get(teams[0], {}).get("seed", 0)
+        out = []
+        for n, i in enumerate(teams):
+            seed = (top_seed if n == 0 else 9 - top_seed) if seeds and top_seed <= 4 else None
+            out.append(bracket.Team(info.get(i, {}).get("abbr", ""), logos.get(i), seed, sr["wins"][i],
+                                    won=i == w, lost=bool(w) and i != w))
+        return bracket.Box(out, series_caption({i: team_name(i) for i in teams}, sr["wins"], 4, final))
+
+    sides = []
+    for conf in ("West", "East"):  # 左邊西區、右邊東區
+        mine = [s for s in series if s["conf"] == conf]
+        r1 = [None] * 4
+        for s in (s for s in mine if s["round"] == 0):
+            top = min(info.get(i, {}).get("seed", 99) for i in s["teams"])
+            if top in FIRST_ROUND_SLOT:
+                r1[FIRST_ROUND_SLOT[top]] = s
+        slot = {i: n for n, s in enumerate(r1) if s for i in s["teams"]}
+        r2 = [None] * 2
+        for s in (s for s in mine if s["round"] == 1):
+            n = slot.get(s["teams"][0])
+            if n is not None:
+                r2[n // 2] = s
+        r3 = next((s for s in mine if s["round"] == 2), None)
+        sides.append(([box(s, seeds=True) for s in r1],
+                      [box(r2[k], [winner(r1[2 * k]), winner(r1[2 * k + 1])]) for k in range(2)],
+                      [box(r3, [winner(r2[0]), winner(r2[1])])],
+                      winner(r3)))
+    finals = next((s for s in series if s["round"] == 3), None)
+    final_box = box(finals, [sides[0][3], sides[1][3]], final=True)
+    return bracket.render(font, f"NBA {season_label(season)} 季後賽", f"更新至 {date}（美東時間）",
+                          ("西區", "東區", "總冠軍賽"), list(sides[0][:3]), list(sides[1][:3]),
+                          final_box, (29, 66, 138))
+
+
+async def playoff_day_message(session: aiohttp.ClientSession, date: str, games: list[dict]) -> tuple:
+    lines = []
+    for g in games:
+        rnd = playoff_round(notes_text(g))
+        lines.append(f"**{rnd[2] if rnd else notes_text(g)}**")
+        if is_called_off(g):
+            lines.append(f"{team_label(side(g, 'away')['team'])} @ {team_label(side(g, 'home')['team'])}："
+                         f"{zh(status_detail(g))}")
+        else:
+            series = game_series_text(g)
+            lines.append(final_line(g) + (f"\n　└ {series}" if series else ""))
+    embed = discord.Embed(title=f"NBA 季後賽戰果｜{date}",
+                          url=f"https://www.espn.com/nba/scoreboard/_/date/{date.replace('-', '')}",
+                          description="\n".join(lines)[:4000], color=0xC8102E)
+    embed.set_footer(text="NBA")
+    embed.timestamp = datetime.now(timezone.utc)
+    content = "📋 **今日 NBA 季後賽全部結束**"
+    if bracket and any(season_type(g) == 3 for g in games):  # 附加賽的日子還沒有對戰圖
+        try:
+            season = (games[0].get("season") or {}).get("year") or 0
+            png = await bracket_image(session, season, date)
+            embed.set_image(url="attachment://bracket.png")
+            return content, embed, png
+        except Exception as e:
+            print(f"⚠️ 畫季後賽對戰圖失敗：{e}")
+    return content, embed
+
+
+async def playoff_day_updates(session: aiohttp.ClientSession, games: list[dict], s: dict, quiet: bool) -> list:
+    """季後賽（含附加賽）的日子，當天比賽全部結束後發一則戰果，附上對戰圖"""
+    done = s.setdefault("post_days", [])
+    by_date: dict[str, list[dict]] = {}
+    for g in games:
+        if season_type(g) in (3, 5):
+            by_date.setdefault(g["_date"], []).append(g)
     messages = []
-    opening = [g for g in games if season_type(g) == 2 and game_status(g)[0] in ("in", "post")]
-    year = (opening[0].get("season") or {}).get("year") if opening else None
-    if year and year > s.get("opened", 0):
+    for date, day_games in sorted(by_date.items()):
+        if date in done or not all(game_status(g)[0] == "post" or is_called_off(g) for g in day_games):
+            continue
+        ready = s.setdefault("post_ready", {}).setdefault(date, time.time())  # 第一次看到全部打完的時間
+        if not quiet and time.time() - ready < PLAYOFF_DAY_DELAY:
+            continue
+        done.append(date)
+        if not quiet:
+            messages.append(await playoff_day_message(session, date, day_games))
+    s["post_days"] = done[-10:]
+    s["post_ready"] = {d: t for d, t in s.get("post_ready", {}).items() if d not in done}
+    return messages
+
+
+async def season_updates(session: aiohttp.ClientSession, games: list[dict], state: dict,
+                         initial: bool) -> tuple[list, list]:
+    """例行賽第一場開打發「開季」、最後一天打完發「例行賽結束」和最終排名，季後賽（含附加賽）第一場開打發
+    「季後賽開打」、每天打完發戰果和對戰圖，總冠軍賽打完發「休賽季開始」
+    回傳 (要排在比賽訊息前面的, 要排在後面的)"""
+    s = state.setdefault("season", {})
+    first_time = s.get("v") != SEASON_STATE_VERSION
+    if first_time:  # 第一次執行（或舊版升級）：已經開打的球季、季後賽當作發過了，避免季中才裝就發
+        year, kind = league_season.get("year"), (league_season.get("type") or {}).get("type") or 0
+        if year and kind in (2, 3, 5):
+            s["opened"] = max(s.get("opened", 0), year)
+        if year and kind in (3, 5):
+            s["playoffs"] = s["reg_end"] = year
+        s["v"] = SEASON_STATE_VERSION
+    quiet = initial or first_time
+    before, after = [], []
+    year, today = first_started(games, {2})
+    if year > s.get("opened", 0):
         s["opened"] = year
-        if not (initial or first_time):
-            day = opening[0]["_date"]
-            messages.append(season_open_message(year, [g for g in games
-                                                       if g["_date"] == day and season_type(g) == 2]))
+        if not quiet:
+            before.append(season_start_message("🎉 **NBA 開季**", f"NBA {season_label(year)} 球季開幕",
+                                               "例行賽正式開打！", today, 0x1D428A))
+    year, today = first_started(games, {3, 5})
+    if year > s.get("playoffs", 0):
+        s["playoffs"] = year
+        s["opened"] = max(s.get("opened", 0), year)
+        if not quiet:
+            intro = "附加賽開打，季後賽正式開始！" if any(season_type(g) == 5 for g in today) else "季後賽正式開打！"
+            before.append(season_start_message("🔥 **NBA 季後賽開打**", f"NBA {season_label(year)} 季後賽開打",
+                                               intro, today, 0xC8102E))
+    # 例行賽最後一天：當天的例行賽都打完，而且每隊都打完所有比賽
+    regular = [g for g in games if season_type(g) == 2]
+    last_day = [g for g in regular if g["_date"] == max((g["_date"] for g in regular), default="")]
+    year = (last_day[0].get("season") or {}).get("year") or 0 if last_day else 0
+    if (year > s.get("reg_end", 0) and datetime.now(ET).month in REG_END_MONTHS
+            and all(game_status(g)[0] == "post" or is_called_off(g) for g in last_day)
+            and time.time() - s.get("reg_checked", 0) >= REG_END_CHECK_SECONDS):
+        s["reg_checked"] = time.time()
+        try:
+            confs = await regular_season_over(session, year)
+        except Exception as e:
+            print(f"⚠️ 檢查例行賽是否結束失敗：{e}")
+            confs = None
+        if confs:
+            s["reg_end"] = year
+            if not quiet:
+                after.append(standings_message(year, confs))
+    after += await playoff_day_updates(session, games, s, quiet)
     for game in games:
         year = (game.get("season") or {}).get("year") or 0
-        if is_title_clincher(game) and year > s.get("closed", 0):
+        # 等當天的季後賽戰果發出後，才接著發休賽季開始
+        if is_title_clincher(game) and year > s.get("closed", 0) and game["_date"] in s["post_days"]:
             s["closed"] = year
-            if not (initial or first_time):
-                messages.append(season_end_message(year, game))
-    return messages
+            if not quiet:
+                after.append(season_end_message(year, game))
+    return before, after
 
 
 # ===== 比對新舊資料，產生要發送的訊息 =====
@@ -1014,7 +1283,8 @@ async def game_updates(session: aiohttp.ClientSession, state: dict, initial: boo
         if cur["periods"] > prev["periods"]:  # 漏掉好幾節時只發最新一節
             messages.append(period_message(game))
     state["games"] = new_games
-    return messages + season_updates(games, state, initial)
+    before, after = await season_updates(session, games, state, initial)
+    return before + messages + after
 
 
 async def tx_updates(session: aiohttp.ClientSession, state: dict, initial: bool) -> list:
@@ -1423,9 +1693,10 @@ class NBABot(discord.Client):
         if channel is None:
             print("⚠️ 找不到頻道，請確認 CHANNEL_ID 和機器人權限")
             return  # 不存狀態，下次再試
-        for content, embed in messages:
+        for content, embed, *image in messages:  # 有些訊息附一張圖（季後賽對戰圖）
             try:
-                await channel.send(content=content, embed=embed)
+                files = [discord.File(io.BytesIO(image[0]), "bracket.png")] if image else []
+                await channel.send(content=content, embed=embed, files=files)
                 print(f"已發送：{content} {embed.title}")
             except discord.HTTPException as e:
                 print(f"⚠️ 發送失敗：{e}")
