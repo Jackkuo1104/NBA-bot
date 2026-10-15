@@ -51,6 +51,12 @@ SEEN_LIMIT = 500  # 只保留最近的 ID，避免檔案無限變大
 TW = timezone(timedelta(hours=8))
 ET = ZoneInfo("America/New_York")  # 自動處理夏令/冬令時間
 REFRESH_SECONDS = 12 * 3600  # 球隊清單多久重新抓一次
+DRAFT_URL = "https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/draft"
+LOTTERY_PICKS = 14  # 樂透籤（沒進季後賽的 14 隊）
+# 抽籤前排第 1~14 的隊伍抽中狀元的機率（%）
+LOTTERY_ODDS = [14.0, 14.0, 14.0, 12.5, 10.5, 9.0, 7.5, 6.0, 4.5, 3.0, 2.0, 1.5, 1.0, 0.5]
+DRAFT_BUSY_MONTHS = (4, 5, 6, 7)  # 樂透抽籤（5 月）到選秀（6 月）前後每次都檢查，其他月份每小時一次
+DRAFT_LIVE_SECONDS = 15 * 60  # 最後一次有人被選中後 15 分鐘內算「選秀進行中」，GitHub 版會每 20 秒檢查一次
 
 TEAMS = {  # 預設的 ESPN 球隊 ID → (縮寫, 中文隊名)；執行時會用 API 的最新球隊清單更新
     "1": ("ATL", "老鷹"), "2": ("BOS", "塞爾提克"), "17": ("BKN", "籃網"), "30": ("CHA", "黃蜂"),
@@ -609,7 +615,6 @@ def final_message(game: dict) -> tuple[str, discord.Embed]:
 
 
 def status_message(game: dict) -> tuple[str, discord.Embed]:
-    t = (game.get("status") or {}).get("type") or {}
     lines = [f"狀態：{zh(status_detail(game))}", clock_text(game)]
     return "⏸️ **比賽狀態更新**", game_embed(game, score_title(game), lines, 0x757575)
 
@@ -1022,6 +1027,226 @@ async def honor_updates(session: aiohttp.ClientSession, state: dict, initial: bo
     return [honor_message(season, *h) for h in new]
 
 
+# ===== 選秀、樂透抽籤 =====
+def draft_year() -> int:
+    """選秀在 6 月，8 月以後就看明年的選秀"""
+    now = datetime.now(ET)
+    return now.year if now.month <= 7 else now.year + 1
+
+
+async def fetch_draft(session: aiohttp.ClientSession, year: int) -> dict | None:
+    """某年的選秀資料；順位還沒決定（找不到）時回傳 None"""
+    async with session.get(DRAFT_URL, params={"season": str(year)},
+                           timeout=aiohttp.ClientTimeout(total=15)) as resp:
+        if resp.status == 404:
+            return None
+        resp.raise_for_status()
+        data = await resp.json()
+    return data if data.get("picks") else None
+
+
+def pick_made(p: dict) -> bool:
+    return p.get("status") == "SELECTION_MADE" and bool((p.get("athlete") or {}).get("displayName"))
+
+
+def draft_team(team_id) -> str:
+    known = nba_teams.get(str(team_id))
+    return f"{known[1]} {known[0]}" if known else str(team_id)
+
+
+def trade_note(p: dict) -> str:
+    """via IND → 原屬 IND；from MEM via ATL and UTA → 原屬 MEM，經 ATL、UTA；Traded to MIN → 選後交易至 MIN"""
+    note = (p.get("tradeNote") or "").strip()
+    if not note:
+        return ""
+    m = re.match(r"traded to\s+(.+)", note, re.I)
+    if m:
+        return f"（選後交易至 {m.group(1)}）"
+    frm = re.search(r"\bfrom\s+(\w+)", note, re.I)
+    via = re.search(r"\bvia\s+(.+)$", note, re.I)
+    if not frm and not via:
+        return f"（{note}）"
+    if not frm:  # 只有 via：就是原本的球隊
+        return f"（原屬 {via.group(1).replace(' and ', '、')}）"
+    return f"（原屬 {frm.group(1)}" + (f"，經 {via.group(1).replace(' and ', '、')}" if via else "") + "）"
+
+
+def pick_line(p: dict, positions: dict) -> str:
+    a = p.get("athlete") or {}
+    pos = positions.get(str((a.get("position") or {}).get("id")), "")
+    school = (a.get("team") or {}).get("shortDisplayName") or (a.get("team") or {}).get("location", "")
+    extra = "｜".join(x for x in (POS_ZH.get(pos, pos), school) if x)
+    return (f"**#{p.get('overall')}** {draft_team(p.get('teamId'))}{trade_note(p)}："
+            f"{a.get('displayName', '')}" + (f"｜{extra}" if extra else ""))
+
+
+def draft_embed(year: int, title: str, lines: list[str], color: int = 0x1D428A) -> discord.Embed:
+    embed = discord.Embed(title=title[:256], description="\n".join(lines)[:4000], color=color,
+                          url="https://www.espn.com/nba/draft/rounds")
+    embed.set_footer(text=f"{year} NBA 選秀")
+    embed.timestamp = datetime.now(timezone.utc)
+    return embed
+
+
+def order_message(year: int, picks: list[dict]) -> tuple[str, discord.Embed]:
+    """抽籤前的選秀順位：樂透區 14 隊（含狀元機率）＋ 第 15~30 順位"""
+    lines = ["**樂透區（5 月抽籤決定前 4 順位）**"]
+    for i, p in enumerate(picks[:LOTTERY_PICKS], 1):
+        lines.append(f"第 {i} 順位：{draft_team(p.get('teamId'))}{trade_note(p)}　狀元機率 {LOTTERY_ODDS[i - 1]}%")
+    lines.append("\n**第 15～30 順位（依戰績）**")
+    lines += [f"第 {p.get('overall')} 順位：{draft_team(p.get('teamId'))}{trade_note(p)}"
+              for p in picks[LOTTERY_PICKS:30]]
+    return "📋 **NBA 選秀順位公布（樂透抽籤前）**", draft_embed(year, f"{year} NBA 選秀順位", lines)
+
+
+def move_text(team: str, slot: int, before: list[str] | None) -> str:
+    if not before or team not in before:
+        return ""
+    was = before.index(team) + 1
+    odds = f"（抽籤前排第 {was}，狀元機率 {LOTTERY_ODDS[was - 1]}%）" if was <= len(LOTTERY_ODDS) else ""
+    if was > slot:
+        return f"⬆️ 上升 {was - slot} 名{odds}"
+    if was < slot:
+        return f"⬇️ 下滑 {slot - was} 名{odds}"
+    return f"➖ 維持原順位{odds}"
+
+
+def lottery_reveal(year: int, order: list[str], before: list[str] | None) -> list:
+    """樂透抽籤揭曉：從第 14 順位一隊一隊發到狀元，最後發一則總整理"""
+    messages = []
+    for slot in range(len(order), 0, -1):
+        team = order[slot - 1]
+        if slot == 1:
+            content, title = "🏆 **NBA 狀元籤揭曉！**", f"{year} 狀元籤：{draft_team(team)}"
+        else:
+            content, title = "🎰 **NBA 樂透抽籤**", f"第 {slot} 順位：{draft_team(team)}"
+        messages.append((content, draft_embed(year, title, [move_text(team, slot, before)], 0x7B1FA2)))
+    lines = []
+    for slot in range(1, len(order) + 1):
+        team = order[slot - 1]
+        move = ""
+        if before and team in before:
+            was = before.index(team) + 1
+            move = f"（⬆️ 原第 {was}）" if was > slot else f"（⬇️ 原第 {was}）" if was < slot else ""
+        lines.append(f"{'🏆 狀元' if slot == 1 else f'第 {slot} 順位'}：{draft_team(team)}{move}")
+    messages.append(("📋 **NBA 樂透抽籤結果**", draft_embed(year, f"{year} NBA 選秀樂透抽籤結果", lines, 0x7B1FA2)))
+    return messages
+
+
+def pick_message(year: int, p: dict, positions: dict) -> tuple[str, discord.Embed]:
+    """選秀：每選一位發一則"""
+    a = p.get("athlete") or {}
+    pos = positions.get(str((a.get("position") or {}).get("id")), "")
+    school = a.get("team") or {}
+    lines = [f"第 {p.get('round')} 輪第 {p.get('pick')} 順位"]
+    if pos:
+        lines.append(f"位置：{POS_ZH.get(pos, pos)}")
+    if school.get("location") or school.get("shortDisplayName"):
+        lines.append(f"來自：{school.get('location') or school.get('shortDisplayName')}")
+    if a.get("displayHeight"):
+        lines.append(f"身高 {a['displayHeight']}" + (f"｜體重 {a['displayWeight']}" if a.get("displayWeight") else ""))
+    note = trade_note(p)
+    if note:
+        lines.append(f"選秀權：{note.strip('（）')}")
+    embed = draft_embed(year, f"第 {p.get('overall')} 順位｜{draft_team(p.get('teamId'))} 選中 {a.get('displayName', '')}",
+                        lines)
+    if a.get("link"):
+        embed.url = a["link"]
+    if (a.get("headshot") or {}).get("href"):
+        embed.set_thumbnail(url=a["headshot"]["href"])
+    return "🏀 **NBA 選秀**", embed
+
+
+def draft_results(year: int, picks: list[dict], positions: dict) -> list:
+    """選秀結束：每一輪一則完整名單（含選秀當天的交易）"""
+    messages = []
+    for rnd in sorted({p.get("round") for p in picks}):
+        lines = [pick_line(p, positions) for p in picks if p.get("round") == rnd]
+        messages.append((f"📋 **{year} NBA 選秀結果**" if not messages else "📋 **（續）**",
+                         draft_embed(year, f"{year} NBA 選秀結果｜第 {rnd} 輪", lines)))
+    return messages
+
+
+def trade_updates(year: int, picks: list[dict], d: dict) -> list:
+    """選秀權換隊（還沒選）或選完馬上被交易（ESPN 註記 Traded to XXX）"""
+    owners, notes = d.setdefault("owners", {}), d.setdefault("notes", {})
+    messages = []
+    for p in picks:
+        key, team, note = str(p.get("overall")), str(p.get("teamId")), p.get("tradeNote") or ""
+        old_team, old_note = owners.get(key), notes.get(key)
+        # 抽籤前，前 14 順位的球隊會因抽籤換位置，不算交易
+        watching = d.get("announced") and (d.get("lottery_done") or p.get("overall", 0) > LOTTERY_PICKS)
+        if watching and old_team and old_team != team and not pick_made(p):
+            messages.append(("🔄 **NBA 選秀權交易**", draft_embed(
+                year, f"第 {key} 順位籤：{draft_team(old_team)} → {draft_team(team)}",
+                [f"第 {p.get('round')} 輪第 {p.get('pick')} 順位"], 0xF57C00)))
+        if pick_made(p) and old_note is not None and old_note != note and re.match(r"traded to", note, re.I):
+            name = (p.get("athlete") or {}).get("displayName", "")
+            messages.append(("🔄 **NBA 選秀後交易**", draft_embed(
+                year, f"#{key} {name}：{draft_team(team)} 選中後交易至 {note[9:].strip()}",
+                [f"第 {p.get('round')} 輪第 {p.get('pick')} 順位"], 0xF57C00)))
+        owners[key] = team
+        if pick_made(p):
+            notes[key] = note
+    return messages
+
+
+async def draft_updates(session: aiohttp.ClientSession, state: dict, initial: bool) -> list:
+    """選秀順位公布 → 樂透抽籤一隊一隊揭曉 → 抽籤總整理 → 選秀每選一位發一則 → 交易 → 選秀結果"""
+    year = draft_year()
+    d = state["draft"]
+    if d.get("year") != year:  # 換年度：重新開始記錄
+        d.clear()
+        d["year"] = year
+    now = datetime.now(ET)
+    if now.month not in DRAFT_BUSY_MONTHS and time.time() - d.get("checked", 0) < 3600:
+        return []
+    d["checked"] = time.time()
+    data = await fetch_draft(session, year)
+    if data is None:
+        return []
+    picks = sorted(data["picks"], key=lambda p: p.get("overall") or 0)
+    positions = {str(p.get("id")): p.get("abbreviation", "") for p in data.get("positions") or []}
+    order = [str(p.get("teamId")) for p in picks[:LOTTERY_PICKS]]
+    started = any(pick_made(p) for p in picks)
+    # 例行賽 4 月中結束 → 4/15~5/9 公布抽籤前順位；5/10 起是抽籤（通常 5 月中）
+    pre_window = (now.month == 4 and now.day >= 15) or (now.month == 5 and now.day < 10)
+    lottery_window = (now.month == 5 and now.day >= 10) or now.month == 6
+    messages = []
+
+    if started:  # 選秀開始後就不再發順位和抽籤
+        d["announced"] = d["lottery_done"] = True
+    if not d.get("announced") and pre_window and all(order):
+        messages.append(order_message(year, picks))
+        d["announced"] = True
+        d["order"] = order  # 抽籤前的順位，之後拿來比對升降
+    if not d.get("lottery_done") and lottery_window and all(order):
+        before = d.get("order") if d.get("announced") else None
+        reordered = bool(before) and sorted(before) == sorted(order) and before != order
+        unchanged_late = bool(before) and before == order and now.month == 5 and now.day >= 20  # 抽完都沒換位置
+        if reordered or unchanged_late or not before:
+            messages += lottery_reveal(year, order, before)
+            d["announced"] = d["lottery_done"] = True
+            for p in picks[:LOTTERY_PICKS]:  # 抽籤造成的換位置不算交易
+                d.setdefault("owners", {})[str(p.get("overall"))] = str(p.get("teamId"))
+    if not d.get("announced"):
+        d["order"] = order  # 還沒公布前，順位會隨戰績變動，持續更新
+
+    messages += trade_updates(year, picks, d)
+
+    posted = set(d.get("picks", []))
+    new = [p for p in picks if pick_made(p) and p.get("overall") not in posted]
+    if new:
+        d["live_until"] = time.time() + DRAFT_LIVE_SECONDS
+    d["picks"] = sorted(posted | {p.get("overall") for p in new})
+    messages += [pick_message(year, p, positions) for p in new]
+
+    if not d.get("finished") and picks and all(pick_made(p) for p in picks):
+        d["finished"] = True
+        messages += draft_results(year, picks, positions)
+    return [] if initial else messages
+
+
 async def collect_updates(session: aiohttp.ClientSession) -> tuple[list, dict]:
     """回傳 (要發送的 [(文字, embed)], 更新後的狀態)；呼叫端發完訊息後要 save_state"""
     state = load_state() or {}
@@ -1033,7 +1258,8 @@ async def collect_updates(session: aiohttp.ClientSession) -> tuple[list, dict]:
             ("news", "新聞", news_updates, []),
             ("shams", "Shams 新聞", shams_updates, []),
             ("awards", "獎項", award_updates, []),
-            ("honors", "每週/每月獎項", honor_updates, [])):
+            ("honors", "每週/每月獎項", honor_updates, []),
+            ("draft", "選秀", draft_updates, {})):
         # 第一次抓到某個來源時只記錄現有資料，不發文，避免洗版
         initial = key not in state
         state.setdefault(key, empty)
