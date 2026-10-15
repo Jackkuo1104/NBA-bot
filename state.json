@@ -132,5 +132,9 @@
     "checked": 1792053325.7437959
   },
   "health": {},
-  "season": {}
+  "season": {
+    "v": 3,
+    "post_days": [],
+    "post_ready": {}
+  }
 }
