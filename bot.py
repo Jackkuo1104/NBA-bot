@@ -152,6 +152,9 @@ async def get_json(session: aiohttp.ClientSession, url: str, params: dict | None
         return await resp.json()
 
 
+league_season: dict = {}  # 今天的球季資訊（year、type：1 熱身賽 2 例行賽 3 季後賽 4 休賽季），fetch_games 會更新
+
+
 async def fetch_games(session: aiohttp.ClientSession) -> list[dict]:
     """美東時間昨天和今天的所有比賽，涵蓋跨午夜才結束的晚場"""
     today = datetime.now(ET).date()
@@ -159,6 +162,8 @@ async def fetch_games(session: aiohttp.ClientSession) -> list[dict]:
     results = await asyncio.gather(*(
         get_json(session, f"{ESPN_API}/scoreboard", {"dates": d.strftime("%Y%m%d")}) for d in days))
     games = []
+    league_season.clear()
+    league_season.update((results[-1].get("leagues") or [{}])[0].get("season") or {})
     for day, data in zip(days, results):
         for game in data.get("events", []):
             game["_date"] = str(day)  # 美東時間的比賽日期
@@ -906,6 +911,72 @@ def day_done_updates(games: list[dict], state: dict, initial: bool) -> list:
     return messages
 
 
+def season_type(game: dict) -> int:
+    return (game.get("season") or {}).get("type") or 0
+
+
+def is_title_clincher(game: dict) -> bool:
+    """總冠軍賽打完的那一場"""
+    return (season_type(game) == 3 and game_status(game)[0] == "post"
+            and notes_text(game).startswith("NBA Finals")
+            and bool((competition(game).get("series") or {}).get("completed")))
+
+
+def season_open_message(season: int, games: list[dict]) -> tuple[str, discord.Embed]:
+    lines = ["例行賽正式開打！今天的比賽："]
+    lines += [f"• {team_label(side(g, 'away')['team'])} @ {team_label(side(g, 'home')['team'])}" for g in games]
+    embed = discord.Embed(title=f"NBA {season_label(season)} 球季開幕",
+                          url="https://www.espn.com/nba/schedule",
+                          description="\n".join(lines)[:4000], color=0x1D428A)
+    embed.set_footer(text="NBA")
+    embed.timestamp = datetime.now(timezone.utc)
+    return "🎉 **NBA 開季**", embed
+
+
+def season_end_message(season: int, game: dict) -> tuple[str, discord.Embed]:
+    away, home = side(game, "away"), side(game, "home")
+    winner, loser = (away, home) if away.get("winner") else (home, away)
+    result = re.search(r"(\d+)-(\d+)", (competition(game).get("series") or {}).get("summary", ""))
+    series = f" {result[1]}-{result[2]}" if result else ""
+    lines = [f"🏆 **{team_label(winner['team'])}** 在總冠軍賽以{series} 擊敗 {team_label(loser['team'])}，"
+             f"拿下 {season_label(season)} 球季總冠軍！",
+             "", "NBA 正式進入休賽季，接下來是選秀和自由球員市場。"]
+    embed = discord.Embed(title=f"NBA {season_label(season)} 球季結束", url=game_url(game),
+                          description="\n".join(lines), color=0xFFB81C)
+    logo = team_logo(winner["team"])
+    if logo:
+        embed.set_thumbnail(url=logo)
+    embed.set_footer(text="NBA")
+    embed.timestamp = datetime.now(timezone.utc)
+    return "🏖️ **NBA 休賽季開始**", embed
+
+
+def season_updates(games: list[dict], state: dict, initial: bool) -> list:
+    """例行賽第一場開打時發「開季」，總冠軍賽打完時發「休賽季開始」"""
+    first_time = "season" not in state
+    s = state.setdefault("season", {})
+    if first_time:  # 第一次執行：已經開打的球季當作發過了，避免季中才裝就發開季
+        year, kind = league_season.get("year"), (league_season.get("type") or {}).get("type") or 0
+        if year and kind >= 2:
+            s["opened"] = year
+    messages = []
+    opening = [g for g in games if season_type(g) == 2 and game_status(g)[0] in ("in", "post")]
+    year = (opening[0].get("season") or {}).get("year") if opening else None
+    if year and year > s.get("opened", 0):
+        s["opened"] = year
+        if not (initial or first_time):
+            day = opening[0]["_date"]
+            messages.append(season_open_message(year, [g for g in games
+                                                       if g["_date"] == day and season_type(g) == 2]))
+    for game in games:
+        year = (game.get("season") or {}).get("year") or 0
+        if is_title_clincher(game) and year > s.get("closed", 0):
+            s["closed"] = year
+            if not (initial or first_time):
+                messages.append(season_end_message(year, game))
+    return messages
+
+
 # ===== 比對新舊資料，產生要發送的訊息 =====
 async def game_updates(session: aiohttp.ClientSession, state: dict, initial: bool) -> list:
     games = await fetch_games(session)
@@ -943,7 +1014,7 @@ async def game_updates(session: aiohttp.ClientSession, state: dict, initial: boo
         if cur["periods"] > prev["periods"]:  # 漏掉好幾節時只發最新一節
             messages.append(period_message(game))
     state["games"] = new_games
-    return messages
+    return messages + season_updates(games, state, initial)
 
 
 async def tx_updates(session: aiohttp.ClientSession, state: dict, initial: bool) -> list:
