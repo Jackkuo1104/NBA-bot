@@ -39,6 +39,7 @@ AWARD_CHECK_MINUTES = float(os.getenv("AWARD_CHECK_MINUTES", "30"))
 
 ESPN_API = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"
 ESPN_CORE = "https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba"
+TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"  # Google 免費翻譯
 WIKI_API = "https://en.wikipedia.org/w/api.php"
 WIKI_HEADERS = {"User-Agent": "NBA-Discord-bot/1.0 (https://github.com/Jackkuo1104/NBA-bot)"}
 SHAMS_KEYWORD = "charania"  # 作者、標題或摘要含這個字的新聞當作 Shams 的消息
@@ -64,6 +65,7 @@ TEAMS = {  # 預設的 ESPN 球隊 ID → (縮寫, 中文隊名)；執行時會�
 # 目前的 NBA 球隊 ID → (縮寫, 顯示名稱)；新球隊沒有中文名時顯示英文隊名
 nba_teams: dict[str, tuple[str, str]] = dict(TEAMS)
 team_by_fullname: dict[str, str] = {}  # 英文全名（例如 Milwaukee Bucks）→ 顯示名稱
+team_terms: set[str] = set()  # 英文隊名（全名、暱稱），翻譯時保留不翻
 _teams_loaded_at = 0.0
 
 AWARD_ZH = {  # ESPN 獎項 ID → 中文名稱；不在這裡的獎項顯示英文名稱
@@ -185,6 +187,7 @@ async def refresh_teams(session: aiohttp.ClientSession) -> None:
             teams[str(t["id"])] = (t.get("abbreviation") or "?", TEAMS.get(str(t["id"]), fallback)[1])
             if t.get("displayName"):
                 fullnames[t["displayName"]] = teams[str(t["id"])][1]
+            team_terms.update(n for n in (t.get("displayName"), t.get("name"), t.get("shortDisplayName")) if n)
     if teams:
         nba_teams.clear()
         nba_teams.update(teams)
@@ -250,6 +253,154 @@ async def fetch_honors(session: aiohttp.ClientSession, season: int) -> list[tupl
         else:
             honors += [(heading, period, east, west) for period, east, west in parse_honor_table(text)]
     return honors
+
+
+# ===== 翻譯 =====
+_zh_cache: dict[str, str] = {}
+_translate_limit = asyncio.Semaphore(5)  # 同時最多 5 個翻譯請求，避免被 Google 擋
+# 異動敘述裡「位置 + 人名」的人名，例如 Waived G Trey Jemison III → Trey Jemison III
+TX_NAME = re.compile(r"\b(?:PG|SG|SF|PF|G|F|C|G-F|F-G|F-C|C-F|[Cc]oach|[Gg]uard|[Ff]orward|[Cc]enter)\s+"
+                     r"((?:[A-Z][\w.'’-]*|Jr\.?|Sr\.?|II|III|IV)(?:\s+(?:[A-Z][\w.'’-]*|Jr\.?|Sr\.?|II|III|IV|de|van|da))+)")
+
+
+FIXED_ZH = {  # 短詞直接對照，不送去翻譯（Google 常翻錯，例如 Postponed → 延遲）
+    "postponed": "延期", "delayed": "延遲", "suspended": "暫停", "canceled": "取消", "cancelled": "取消",
+    "forfeit": "沒收比賽", "final": "終場", "rain": "下雨", "weather": "天候因素", "inclement weather": "天候不佳",
+}
+PRE_ZH = [  # 送去翻譯前先換掉的固定說法
+    (re.compile(r"\bGame Highlights\b"), "比賽精華"),
+    (re.compile(r"\bGame (\d+)\b"), r"第 \1 戰"),
+]
+# 文章沒標記到的人名：連續 2~4 個大寫開頭的字；含下列常見字的不算人名
+NAME_LIKE = re.compile(r"(?<![\w'’])[A-Z][a-z'’.-]+(?: +(?:[A-Z][a-z'’.-]+|Jr\.?|Sr\.?|II|III|IV)){1,3}(?![\w'’])")
+CJK_LATIN = (re.compile(r"([一-鿿])([A-Za-z0-9])"), re.compile(r"([A-Za-z0-9.])([一-鿿])"))
+NOT_NAME = set("""a an the and or of in on at to for with from by vs after before as is are was
+game games highlights east west eastern western semifinals finals final conference most valuable
+player players week month year rookie defensive all star league cup draft trade trades free agent
+summer preseason season playoffs playoff day night monday tuesday wednesday thursday friday saturday
+sunday january february march april may june july august september october november december award
+awards team teams first second third world series american national division wild card opening spring
+training hall fame gold glove silver slugger fantasy basketball baseball mock points power rankings now
+later new era takeaways updates update latest news what why how who which when where takeaway sources
+source report reports breaking live recap preview analysis grades grade best worst top big early late
+manager coach coaches general president owner front office mvp""".split())
+
+
+def guess_names(text: str) -> set[str]:
+    names = set()
+    for m in NAME_LIKE.finditer(text or ""):
+        words = m.group(0).split()
+        if not any(w.lower().strip(".'’") in NOT_NAME for w in words):
+            names |= person_terms(m.group(0))
+    return names
+
+
+def person_terms(*names: str) -> set[str]:
+    """人名和姓氏（文章常只寫姓），翻譯時保留不翻"""
+    terms = set()
+    for name in names:
+        name = (name or "").strip(" .,")
+        if name:
+            terms.add(name)
+            last = re.sub(r"\s+(Jr\.?|Sr\.?|II|III|IV)$", "", name).split()[-1]
+            if len(last) >= 3:
+                terms.add(last)
+    return terms
+
+
+async def translate(session: aiohttp.ClientSession, text: str, keep=()) -> str:
+    """英文翻成繁體中文；keep 和所有隊名先換成代號保護起來，翻完再換回英文。失敗時回傳原文"""
+    if not text or not re.search(r"[A-Za-z]{2}", text):
+        return text
+    if text in _zh_cache:
+        return _zh_cache[text]
+    fixed = [FIXED_ZH.get(p.strip().lower()) for p in text.split(":")]  # 例如 Delayed: Rain
+    if all(fixed):
+        _zh_cache[text] = "：".join(fixed)
+        return _zh_cache[text]
+    terms = sorted({t for t in (*keep, *team_terms) if t and t in text}, key=len, reverse=True)
+    protected = text
+    for pattern, repl in PRE_ZH:
+        protected = pattern.sub(repl, protected)
+    if terms:
+        pattern = re.compile("|".join(rf"(?<!\w){re.escape(t)}(?!\w)" for t in terms))
+        protected = pattern.sub(lambda m: f"__N{terms.index(m.group(0))}__", protected)
+    try:
+        async with _translate_limit, session.get(
+                TRANSLATE_URL, params={"client": "gtx", "sl": "en", "tl": "zh-TW", "dt": "t", "q": protected},
+                timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            resp.raise_for_status()
+            data = await resp.json(content_type=None)
+        out = "".join(seg[0] for seg in data[0] if seg and seg[0])
+        out = re.sub(r"_+\s*[Nn]\s*(\d+)\s*_+",
+                     lambda m: terms[int(m.group(1))] if int(m.group(1)) < len(terms) else m.group(0), out)
+        if not out.strip() or "__N" in out:
+            raise ValueError(f"翻譯結果異常：{out}")
+        for pattern in CJK_LATIN:  # 中文和英文、數字之間加空格比較好讀
+            out = pattern.sub(r"\1 \2", out)
+    except Exception as e:
+        print(f"⚠️ 翻譯失敗，顯示英文原文：{e}")
+        return text
+    _zh_cache[text] = out
+    return out
+
+
+def zh(text: str) -> str:
+    """已經翻譯過的文字回傳中文，沒翻過的回傳原文（翻譯要先用 prefetch 做好）"""
+    return _zh_cache.get(text, text)
+
+
+async def prefetch(session: aiohttp.ClientSession, texts, keep=()) -> None:
+    await asyncio.gather(*(translate(session, t, keep) for t in set(texts) if t))
+
+
+async def zh_article(session: aiohttp.ClientSession, article: dict) -> dict:
+    """新聞標題和摘要翻成中文；文章標記的球員、教練、球隊名稱保留英文"""
+    keep = set()
+    for line in f"{article.get('headline') or ''}\n{article.get('description') or ''}".splitlines():
+        keep |= guess_names(line)
+    for c in article.get("categories") or []:
+        if c.get("type") in ("athlete", "coach", "person"):
+            keep |= person_terms(c.get("description", ""))
+        elif c.get("type") == "team" and c.get("description"):
+            keep.add(c["description"])
+    out = dict(article)
+    for key in ("headline", "description"):
+        out[key] = await translate(session, article.get(key) or "", keep)
+    return out
+
+
+async def zh_articles(session: aiohttp.ClientSession, articles: list[dict]) -> list[dict]:
+    return list(await asyncio.gather(*(zh_article(session, a) for a in articles)))
+
+
+def tx_terms(tx: dict) -> set[str]:
+    return person_terms(*TX_NAME.findall(tx.get("description", "")))
+
+
+TX_VERB_ZH = {  # 異動敘述開頭的動詞
+    "Waived": "釋出", "Released": "釋出", "Signed": "簽下", "Re-signed": "續約", "Agreed": "談妥",
+    "Extended": "延長合約", "Converted": "轉換合約", "Traded": "交易送走", "Acquired": "得到",
+    "Claimed": "認領", "Exercised": "執行", "Declined": "拒絕執行", "Picked": "執行",
+    "Assigned": "下放", "Recalled": "召回", "Hired": "聘請", "Fired": "解雇", "Named": "任命",
+    "Promoted": "升任", "Relieved": "解除職務", "Bought": "買斷",
+}
+POS_ZH = {"PG": "控球後衛", "SG": "得分後衛", "SF": "小前鋒", "PF": "大前鋒", "G": "後衛", "F": "前鋒",
+          "C": "中鋒", "G-F": "後衛/前鋒", "F-G": "前鋒/後衛", "F-C": "前鋒/中鋒", "C-F": "中鋒/前鋒"}
+POS_BEFORE_NAME = re.compile(r"\b(PG|SG|SF|PF|G-F|F-G|F-C|C-F|G|F|C)\s+(?=[A-Z])")
+
+
+async def translate_tx(session: aiohttp.ClientSession, tx: dict) -> None:
+    """異動敘述翻成中文：動詞、位置先自己翻，其他交給 Google；結果存在 zh() 用的快取"""
+    text = tx.get("description", "")
+    if not text or text in _zh_cache:
+        return
+    first, _, rest = text.partition(" ")
+    verb = TX_VERB_ZH.get(first)
+    body = POS_BEFORE_NAME.sub(lambda m: f"{POS_ZH[m.group(1)]} ", rest if verb else text)
+    body = re.sub(r"\s+off waivers from (?:the )?(.+?)\.?$", r"（原屬 \1）", body)
+    body = await translate(session, body.rstrip(". "), tx_terms(tx))  # 動詞自己翻，不讓 Google 改掉
+    _zh_cache[text] = f"{verb} {body}" if verb else body
 
 
 # ===== 小工具 =====
@@ -365,6 +516,27 @@ def score_title(game: dict) -> str:
     return f"{team_label(away['team'])} {score(away)} : {score(home)} {team_label(home['team'])}"
 
 
+def recap_text(game: dict) -> str:
+    return (competition(game).get("headlines") or [{}])[0].get("shortLinkText") or ""
+
+
+def status_detail(game: dict) -> str:
+    t = (game.get("status") or {}).get("type") or {}
+    return t.get("detail") or t.get("description", "")
+
+
+def game_texts(game: dict) -> list[str]:
+    """這場比賽的訊息裡會出現的英文（系列賽說明、比賽狀態、賽後標題）"""
+    return [series_text(game), status_detail(game), recap_text(game)]
+
+
+def game_keep(game: dict) -> set[str]:
+    """賽後標題常提到得分王，人名保留不翻"""
+    names = [((cat.get("leaders") or [{}])[0].get("athlete") or {}).get("displayName", "")
+             for c in competition(game).get("competitors", []) for cat in c.get("leaders") or []]
+    return person_terms(*names)
+
+
 def series_text(game: dict) -> str:
     summary = (competition(game).get("series") or {}).get("summary", "")
     return "｜".join(p for p in (notes_text(game), summary) if p)
@@ -403,7 +575,7 @@ def leaders_line(competitor: dict) -> str:
 def game_embed(game: dict, title: str, lines: list[str], color: int) -> discord.Embed:
     embed = discord.Embed(title=title[:256], url=game_url(game),
                           description="\n".join(l for l in lines if l)[:4000], color=color)
-    series = series_text(game)
+    series = zh(series_text(game))
     embed.set_footer(text=f"NBA｜{series}"[:2048] if series else "NBA")
     embed.timestamp = datetime.now(timezone.utc)
     return embed
@@ -430,15 +602,15 @@ def final_message(game: dict) -> tuple[str, discord.Embed]:
     overtime = f"（{period_name(periods)}）" if periods > 4 else ""
     lines = [f"🏆 **{team_label(winner['team'])}** 獲勝{overtime}" if winner else "🤝 平手",
              leaders_line(away), leaders_line(home), linescore_table(game)]
-    recap = (competition(game).get("headlines") or [{}])[0].get("shortLinkText")
+    recap = recap_text(game)
     if recap:
-        lines.append(f"📝 {recap}")
+        lines.append(f"📝 {zh(recap)}")
     return "🏁 **終場**", game_embed(game, score_title(game), lines, 0xFFB81C)
 
 
 def status_message(game: dict) -> tuple[str, discord.Embed]:
     t = (game.get("status") or {}).get("type") or {}
-    lines = [f"狀態：{t.get('detail') or t.get('description', '')}", clock_text(game)]
+    lines = [f"狀態：{zh(status_detail(game))}", clock_text(game)]
     return "⏸️ **比賽狀態更新**", game_embed(game, score_title(game), lines, 0x757575)
 
 
@@ -481,10 +653,10 @@ def group_trades(txs: list[dict]) -> list[list[dict]]:
 def tx_message(group: list[dict]) -> tuple[str, discord.Embed]:
     label, color, _ = TX_KINDS.get(tx_kind(group[0]), ("📰 異動", 0x757575, ()))
     if len(group) == 1:
-        description = group[0].get("description", "")
+        description = zh(group[0].get("description", ""))
     else:
         description = "\n".join(f"**{team_name(t.get('team', {}).get('id')) or t.get('team', {}).get('displayName', '')}**："
-                                f"{t.get('description', '')}" for t in group)
+                                f"{zh(t.get('description', ''))}" for t in group)
     embed = discord.Embed(title=label, description=description[:4000], color=color)
     team = group[0].get("team") or {}
     if len(group) == 1 and team.get("id"):
@@ -529,7 +701,7 @@ def person_text(person: dict, team_id: str) -> str:
 def award_message(award: dict, season: int,
                   winners: list[tuple[dict, str]]) -> tuple[str, discord.Embed]:
     """winners：[(球員/教練資料, 球隊 ID)]"""
-    name = AWARD_ZH.get(str(award.get("id"))) or award.get("name", "")
+    name = AWARD_ZH.get(str(award.get("id"))) or zh(award.get("name", ""))
     embed = discord.Embed(title=f"{season_label(season)} {name}"[:256],
                           description="\n".join(f"• {person_text(p, t)}" for p, t in winners)[:4000],
                           color=0xFFD700)
@@ -539,7 +711,7 @@ def award_message(award: dict, season: int,
     headshot = (winners[0][0].get("headshot") or {}).get("href") if len(winners) == 1 else None
     if headshot:
         embed.set_thumbnail(url=headshot)
-    embed.set_footer(text=f"NBA 獎項｜{award.get('name', '')}"[:2048])
+    embed.set_footer(text="NBA 獎項")
     embed.timestamp = datetime.now(timezone.utc)
     return "🏆 **NBA 獎項揭曉**", embed
 
@@ -627,14 +799,14 @@ def honor_message(season: int, heading: str, period: str, east: str,
         embed = discord.Embed(title=f"{season_label(season)} {yearly_zh(period)}"[:256],
                               description="\n".join(f"• {zh_winner(w)}" for w in east.split("\n"))[:4000],
                               color=0xFFD700)
-        embed.set_footer(text=f"NBA 獎項｜{period}"[:2048])
+        embed.set_footer(text="NBA 獎項")
         embed.timestamp = datetime.now(timezone.utc)
         return "🏆 **NBA 獎項揭曉**", embed
     name = HONOR_ZH[heading]
     embed = discord.Embed(title=f"{name}｜{zh_period(period)}"[:256],
                           description=f"**東區**：{zh_winner(east)}\n**西區**：{zh_winner(west)}"[:4000],
                           color=0xFFD700)
-    embed.set_footer(text=f"NBA {season_label(season)} {heading.title()}"[:2048])
+    embed.set_footer(text=f"NBA {season_label(season)} 球季")
     embed.timestamp = datetime.now(timezone.utc)
     return f"🏅 **NBA {name}**", embed
 
@@ -743,6 +915,9 @@ async def game_updates(session: aiohttp.ClientSession, state: dict, initial: boo
                 team_abbr(side(game, "away")["team"]), team_abbr(side(game, "home")["team"])):
             continue
 
+        # 這場比賽有變化（可能要發訊息）時，先翻譯訊息裡會用到的英文
+        if (status, name, cur["periods"]) != (prev["state"], prev["status"], prev["periods"]):
+            await prefetch(session, game_texts(game), game_keep(game))
         notable = any(w in name for w in NOTABLE_STATUS)
         if status == "post":
             if prev["state"] != "post":
@@ -767,6 +942,7 @@ async def tx_updates(session: aiohttp.ClientSession, state: dict, initial: bool)
     state["tx"] += [tx_id(t) for t in new_txs]
     if initial:
         return []
+    await asyncio.gather(*(translate_tx(session, t) for t in new_txs))
     return [tx_message(group) for group in group_trades(new_txs)]
 
 
@@ -778,7 +954,8 @@ async def news_updates(session: aiohttp.ClientSession, state: dict, initial: boo
     state["news"] += [article_id(a) for a in new_articles]
     if initial:
         return []
-    return [(news_label(a), news_embed(a)) for a in new_articles]
+    # 用英文原文判斷是不是紀錄類新聞，再發翻譯後的內容
+    return [(news_label(a), news_embed(z)) for a, z in zip(new_articles, await zh_articles(session, new_articles))]
 
 
 async def shams_updates(session: aiohttp.ClientSession, state: dict, initial: bool) -> list:
@@ -790,7 +967,7 @@ async def shams_updates(session: aiohttp.ClientSession, state: dict, initial: bo
     state["shams"] += [article_id(a) for a in new_articles]
     if initial:
         return []
-    return [("🚨 **Shams 最新消息**", news_embed(a)) for a in new_articles]
+    return [("🚨 **Shams 最新消息**", news_embed(a)) for a in await zh_articles(session, new_articles)]
 
 
 async def award_updates(session: aiohttp.ClientSession, state: dict, initial: bool) -> list:
@@ -822,6 +999,7 @@ async def award_updates(session: aiohttp.ClientSession, state: dict, initial: bo
                 data = {}
         return data, ref_id(w.get("team"), "teams")
 
+    await prefetch(session, [a.get("name", "") for _, a, _ in new if str(a.get("id")) not in AWARD_ZH])
     messages = []
     for season, award, fresh in new:
         winners = list(await asyncio.gather(*(person(w) for w in fresh)))
@@ -923,8 +1101,7 @@ def scoreboard_line(game: dict) -> str:
         return (f"🕒 {team_label(away['team'])} @ {team_label(home['team'])}"
                 f"｜台灣時間 {start:%m/%d %H:%M}")
     if status == "post":
-        detail = ((game.get("status") or {}).get("type") or {}).get("shortDetail", "")
-        return f"🏁 {final_line(game)}" + (f"｜{detail}" if is_called_off(game) else "")
+        return f"🏁 {final_line(game)}" + (f"｜{zh(status_detail(game))}" if is_called_off(game) else "")
     return f"🔴 {final_line(game)}｜{clock_text(game)}"
 
 
@@ -941,6 +1118,7 @@ async def score_command(interaction: discord.Interaction):
     if not games:
         await interaction.followup.send("今天（美國時間）沒有 NBA 比賽。")
         return
+    await prefetch(bot.session, [status_detail(g) for g in games if is_called_off(g)])
     embed = discord.Embed(title=f"NBA 比分｜{today}",
                           description="\n".join(scoreboard_line(g) for g in games)[:4000],
                           color=0x1D428A)
@@ -960,7 +1138,8 @@ async def news_command(interaction: discord.Interaction,
     if not articles:
         await interaction.followup.send("ESPN 最近 50 則新聞裡沒有重大消息。")
         return
-    await interaction.followup.send(embeds=[news_embed(a) for a in articles[:count]])
+    articles = await zh_articles(bot.session, articles[:count])
+    await interaction.followup.send(embeds=[news_embed(a) for a in articles])
 
 
 @bot.tree.command(name="shams", description="查看最近的 Shams 新聞")
@@ -976,7 +1155,8 @@ async def shams_command(interaction: discord.Interaction,
     if not articles:
         await interaction.followup.send("ESPN 最近 50 則新聞裡沒有 Shams 的消息。")
         return
-    await interaction.followup.send(embeds=[news_embed(a) for a in articles[:count]])
+    articles = await zh_articles(bot.session, articles[:count])
+    await interaction.followup.send(embeds=[news_embed(a) for a in articles])
 
 
 @bot.tree.command(name="moves", description="查看最近的 NBA 簽約、交易")
@@ -992,8 +1172,11 @@ async def moves_command(interaction: discord.Interaction,
     if not txs:
         await interaction.followup.send(f"最近 {days} 天沒有簽約或交易。")
         return
+    txs = txs[-40:]  # 最多翻譯最近 40 筆，embed 也放不下更多
+    await asyncio.gather(*(translate_tx(bot.session, t) for t in txs))
     lines = [f"{TX_KINDS.get(tx_kind(t), ('•',))[0]}｜{(t.get('date') or '')[:10]}｜"
-             f"{team_abbr(t.get('team', {}))}：{t.get('description', '')}" for t in reversed(txs)]
+             f"{team_name(t.get('team', {}).get('id')) or team_abbr(t.get('team', {}))}："
+             f"{zh(t.get('description', ''))}" for t in reversed(txs)]
     text = ""
     for line in lines:  # 新的在上面，塞到 embed 上限為止
         if len(text) + len(line) > 3900:
