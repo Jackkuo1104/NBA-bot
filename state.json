@@ -156,12 +156,17 @@
     "50176173"
   ],
   "honors": [],
-  "honors_checked": 1792133728.0458248,
+  "honors_checked": 1792135849.4545472,
   "draft": {
     "year": 2027,
     "checked": 1792133058.9974875
   },
-  "health": {},
+  "health": {
+    "獎項": {
+      "since": 1792135849.3800247,
+      "error": ""
+    }
+  },
   "season": {
     "v": 3,
     "post_days": [],
