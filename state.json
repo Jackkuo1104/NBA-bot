@@ -76,7 +76,9 @@
     "2026-10-14",
     "2026-10-15"
   ],
-  "tx": [],
+  "tx": [
+    "2026-10-16|2|Re-signed G Payton Pritchard to a veteran extension."
+  ],
   "news": [
     "50151066",
     "50153526",
@@ -163,7 +165,7 @@
   "honors_checked": 1792176631.167038,
   "draft": {
     "year": 2027,
-    "checked": 1792174231.6231964
+    "checked": 1792178128.9484363
   },
   "health": {},
   "season": {
