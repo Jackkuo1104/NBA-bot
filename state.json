@@ -41,14 +41,15 @@
       "periods": 4
     },
     "401908622": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     }
   },
   "days_done": [
     "2026-10-13",
-    "2026-10-14"
+    "2026-10-14",
+    "2026-10-15"
   ],
   "tx": [],
   "news": [
