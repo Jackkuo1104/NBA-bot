@@ -159,9 +159,18 @@
   "honors_checked": 1792135849.4545472,
   "draft": {
     "year": 2027,
-    "checked": 1792133058.9974875
+    "checked": 1792136726.4933116
   },
-  "health": {},
+  "health": {
+    "新聞": {
+      "since": 1792136726.4746099,
+      "error": "ESPN 新聞回傳是空的"
+    },
+    "Shams 新聞": {
+      "since": 1792136726.4932828,
+      "error": "ESPN 新聞回傳是空的"
+    }
+  },
   "season": {
     "v": 3,
     "post_days": [],
