@@ -46,9 +46,9 @@
       "periods": 4
     },
     "401898409": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401908948": {
       "state": "post",
@@ -57,8 +57,8 @@
     },
     "401898719": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 2
+      "status": "STATUS_END_PERIOD",
+      "periods": 3
     }
   },
   "days_done": [
