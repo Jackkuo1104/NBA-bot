@@ -41,14 +41,14 @@
       "periods": 4
     },
     "401901822": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401906509": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401908943": {
       "state": "in",
@@ -168,7 +168,7 @@
   "honors_checked": 1792202723.9892578,
   "draft": {
     "year": 2027,
-    "checked": 1792200637.3138723
+    "checked": 1792204521.3897905
   },
   "health": {},
   "season": {
