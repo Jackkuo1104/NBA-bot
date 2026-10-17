@@ -37,8 +37,8 @@
     },
     "401898843": {
       "state": "in",
-      "status": "STATUS_HALFTIME",
-      "periods": 2
+      "status": "STATUS_IN_PROGRESS",
+      "periods": 1
     },
     "401901822": {
       "state": "in",
