@@ -28,7 +28,8 @@ except ImportError:
 # ===== 設定 =====
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-# 要發消息的頻道 ID，可以填好幾個（用逗號隔開，可以在不同伺服器），每則消息都會發到所有頻道
+# bot 會自動發到它被單獨加進去的頻道（頻道權限裡加入這個 bot 並允許發送訊息）；
+# 這裡可以另外指定頻道 ID（選填，好幾個用逗號隔開），每則消息都會發到所有頻道
 CHANNEL_IDS = [int(c) for c in re.split(r"[,\s]+", os.getenv("CHANNEL_ID") or "") if c.isdigit()]
 CHECK_SECONDS = float(os.getenv("CHECK_SECONDS", "60"))
 # 只追蹤這些球隊的比分和異動（逗號分隔的 ESPN 縮寫，例如 LAL,GS,NY）；留空代表全部球隊
@@ -329,6 +330,28 @@ def person_terms(*names: str) -> set[str]:
     return terms
 
 
+TRANSLATE_CLIENTS = ["dict-chrome-ex", "gtx"]  # Google 免費翻譯的幾種用法，被擋（429）就換下一個
+_translate_client = [0]  # 目前用哪一個
+
+
+async def google_translate(session: aiohttp.ClientSession, text: str) -> list:
+    for _ in TRANSLATE_CLIENTS:
+        n = _translate_client[0]
+        try:
+            async with _translate_limit, session.get(
+                    TRANSLATE_URL, params={"client": TRANSLATE_CLIENTS[n], "sl": "en", "tl": "zh-TW", "dt": "t",
+                                           "q": text},
+                    timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                resp.raise_for_status()
+                return await resp.json(content_type=None)
+        except aiohttp.ClientResponseError as e:
+            if e.status not in (403, 429):
+                raise
+            if _translate_client[0] == n:  # 這個被擋了，之後都改用下一個
+                _translate_client[0] = (n + 1) % len(TRANSLATE_CLIENTS)
+    raise RuntimeError("Google 翻譯的每種用法都被擋")
+
+
 async def translate(session: aiohttp.ClientSession, text: str, keep=()) -> str:
     """英文翻成繁體中文；keep 和所有隊名先換成代號保護起來，翻完再換回英文。失敗時回傳原文"""
     if not text or not re.search(r"[A-Za-z]{2}", text):
@@ -347,11 +370,7 @@ async def translate(session: aiohttp.ClientSession, text: str, keep=()) -> str:
         pattern = re.compile("|".join(rf"(?<!\w){re.escape(t)}(?!\w)" for t in terms))
         protected = pattern.sub(lambda m: f"__N{terms.index(m.group(0))}__", protected)
     try:
-        async with _translate_limit, session.get(
-                TRANSLATE_URL, params={"client": "gtx", "sl": "en", "tl": "zh-TW", "dt": "t", "q": protected},
-                timeout=aiohttp.ClientTimeout(total=10)) as resp:
-            resp.raise_for_status()
-            data = await resp.json(content_type=None)
+        data = await google_translate(session, protected)
         out = "".join(seg[0] for seg in data[0] if seg and seg[0])
         out = re.sub(r"_+\s*[Nn]\s*(\d+)\s*_+",
                      lambda m: terms[int(m.group(1))] if int(m.group(1)) < len(terms) else m.group(0), out)
@@ -571,15 +590,21 @@ def linescore_table(game: dict) -> str:
     if not n:
         return ""
     labels = [str(i) if i <= 4 else ("OT" if i == 5 else f"{i - 4}OT") for i in range(1, n + 1)]
+    # 手機一行大約只放得下 33 個字，每格只留需要的寬度（打到 3OT 約 32 個字），太寬會自動換行跑版
+    vals = {}
+    for c in (away, home):
+        v = [str(x.get("displayValue", "")) for x in c.get("linescores") or []]
+        vals[id(c)] = v + [""] * (n - len(v))
+    widths = [max(len(labels[k]), *(len(v[k]) for v in vals.values())) for k in range(n)]
+    names = [team_abbr(c["team"]) for c in (away, home)]
+    name_w, total_w = max(len(x) for x in names), max(len(str(score(c))) for c in (away, home))
 
-    def row(c: dict) -> str:
-        vals = [str(x.get("displayValue", "")) for x in c.get("linescores") or []]
-        vals += [""] * (n - len(vals))
-        cells = " ".join(f"{v:>3}" for v in vals)
-        return f"{team_abbr(c['team']):<5}{cells} |{score(c):>4}"
+    def line(label: str, cells: list[str], total: str) -> str:
+        return (f"{label:<{name_w}} " + " ".join(f"{v:>{w}}" for v, w in zip(cells, widths))
+                + f" | {total:>{total_w}}")
 
-    header = "     " + " ".join(f"{l:>3}" for l in labels) + " |   T"
-    return "```\n" + "\n".join([header, row(away), row(home)]) + "\n```"
+    rows = [line("", labels, "T")] + [line(nm, vals[id(c)], str(score(c))) for nm, c in zip(names, (away, home))]
+    return "```\n" + "\n".join(rows) + "\n```"
 
 
 def leaders_line(competitor: dict) -> str:
@@ -1175,7 +1200,9 @@ async def playoff_day_updates(session: aiohttp.ClientSession, games: list[dict],
             by_date.setdefault(g["_date"], []).append(g)
     messages = []
     for date, day_games in sorted(by_date.items()):
-        if date in done or not all(game_status(g)[0] == "post" or is_called_off(g) for g in day_games):
+        if date in done or all(is_called_off(g) for g in day_games):  # 整天都延賽：不發
+            continue
+        if not all(game_status(g)[0] == "post" or is_called_off(g) for g in day_games):
             continue
         ready = s.setdefault("post_ready", {}).setdefault(date, time.time())  # 第一次看到全部打完的時間
         if not quiet and time.time() - ready < PLAYOFF_DAY_DELAY:
@@ -1184,7 +1211,7 @@ async def playoff_day_updates(session: aiohttp.ClientSession, games: list[dict],
         if not quiet:
             messages.append(await playoff_day_message(session, date, day_games))
     s["post_days"] = done[-10:]
-    s["post_ready"] = {d: t for d, t in s.get("post_ready", {}).items() if d not in done}
+    s["post_ready"] = {d: t for d, t in s.get("post_ready", {}).items() if d not in done and d in by_date}
     return messages
 
 
@@ -1666,6 +1693,22 @@ async def collect_updates(session: aiohttp.ClientSession) -> tuple[list, dict]:
 
 
 # ===== Discord 機器人 =====
+def joined_channels(client: discord.Client) -> list:
+    """bot 被單獨加進去的頻道（頻道權限裡特別允許這個 bot 或它的專屬身分組發送訊息），加上 CHANNEL_ID 指定的頻道。
+    只是邀請進伺服器、沒有加進任何頻道的話不會發"""
+    found = []
+    for guild in client.guilds:
+        for ch in guild.text_channels:
+            for target, ow in ch.overwrites.items():
+                is_me = target.id == client.user.id or (
+                    isinstance(target, discord.Role) and target.tags and target.tags.bot_id == client.user.id)
+                if is_me and ow.send_messages:
+                    found.append(ch)
+                    break
+    found += [c for c in map(client.get_channel, CHANNEL_IDS) if c is not None and c not in found]
+    return found
+
+
 class NBABot(discord.Client):
     def __init__(self):
         super().__init__(intents=discord.Intents.default())
@@ -1689,10 +1732,9 @@ class NBABot(discord.Client):
     @tasks.loop(seconds=60)
     async def check_updates(self):
         messages, state = await collect_updates(self.session)
-        channels = [c for c in map(self.get_channel, CHANNEL_IDS) if c is not None]
-        if len(channels) < len(CHANNEL_IDS):
-            print("⚠️ 有頻道找不到，請確認 CHANNEL_ID 和機器人權限")
+        channels = joined_channels(self)
         if not channels:
+            print("⚠️ bot 還沒有被加進任何頻道：請在頻道的權限設定加入這個 bot 並允許發送訊息")
             return  # 不存狀態，下次再試
         for content, embed, *image in messages:  # 有些訊息附一張圖（季後賽對戰圖）
             for channel in channels:
@@ -1806,8 +1848,6 @@ async def moves_command(interaction: discord.Interaction,
 
 
 if __name__ == "__main__":
-    missing = [k for k, v in {"DISCORD_TOKEN": DISCORD_TOKEN, "CHANNEL_ID": CHANNEL_IDS}.items()
-               if not v]
-    if missing:
-        raise SystemExit(f"請先在 .env 設定：{', '.join(missing)}（CHANNEL_ID 必須是數字）")
+    if not DISCORD_TOKEN:
+        raise SystemExit("請先在 .env 設定 DISCORD_TOKEN")
     bot.run(DISCORD_TOKEN)
