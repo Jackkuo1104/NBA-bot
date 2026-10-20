@@ -1,8 +1,8 @@
 {
   "games": {
     "401909088": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909089": {
@@ -74,7 +74,8 @@
     "50222332",
     "50223341",
     "50228876",
-    "50229436"
+    "50229436",
+    "50230331"
   ],
   "awards": [
     "2026:33:4278073:25",
@@ -138,13 +139,14 @@
   "honors_checked": 1792521929.0810528,
   "draft": {
     "year": 2027,
-    "checked": 1792519526.3257997
+    "checked": 1792523430.3698113
   },
   "health": {},
   "season": {
     "v": 3,
     "post_days": [],
-    "post_ready": {}
+    "post_ready": {},
+    "opened": 2027
   },
   "tx_filter": "['claim', 'sign', 'trade']|False|[]",
   "contracts": {
@@ -152,13 +154,13 @@
       "text": "1 年 4,000 萬美元",
       "how": [],
       "terms": [],
-      "t": 1792523126.2263353
+      "t": 1792523428.2347584
     },
     "brandon miller": {
       "text": "5 年 2.09 億美元",
       "how": [],
       "terms": [],
-      "t": 1792523126.2263353
+      "t": 1792523428.2347584
     }
   }
 }
