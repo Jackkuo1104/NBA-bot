@@ -2,8 +2,8 @@
   "games": {
     "401909088": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 1
+      "status": "STATUS_HALFTIME",
+      "periods": 2
     },
     "401909089": {
       "state": "pre",
@@ -139,7 +139,7 @@
   "honors_checked": 1792525828.7577899,
   "draft": {
     "year": 2027,
-    "checked": 1792523430.3698113
+    "checked": 1792527031.056003
   },
   "health": {},
   "season": {
@@ -154,13 +154,13 @@
       "text": "1 年 4,000 萬美元",
       "how": [],
       "terms": [],
-      "t": 1792526897.1791327
+      "t": 1792527030.886537
     },
     "brandon miller": {
       "text": "5 年 2.09 億美元",
       "how": [],
       "terms": [],
-      "t": 1792526897.1791327
+      "t": 1792527030.886537
     }
   }
 }
