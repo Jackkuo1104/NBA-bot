@@ -11,6 +11,7 @@ import re
 import json
 import time
 import asyncio
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -38,7 +39,7 @@ FOLLOW_TEAMS = {t.strip().upper() for t in os.getenv("FOLLOW_TEAMS", "").split("
 # option 合約選項、coach 教練/球團人事、gleague 下放/召回發展聯盟
 TX_TYPES = {t.strip().lower() for t in (os.getenv("TX_TYPES") or "trade,sign,claim").split(",")
             if t.strip()}
-SKIP_MINOR_DEALS = os.getenv("SKIP_MINOR_DEALS", "true").strip().lower() == "true"
+SKIP_MINOR_DEALS = os.getenv("SKIP_MINOR_DEALS", "false").strip().lower() == "true"
 # 要推送的 ESPN 新聞類型：HeadlineNews 是突發/重大新聞；可加 Story、Recap、Preview、Media
 NEWS_TYPES = {t.strip() for t in os.getenv("NEWS_TYPES", "HeadlineNews").split(",") if t.strip()}
 # 每幾分鐘檢查一次年度獎項
@@ -293,6 +294,38 @@ PRE_ZH = [  # 送去翻譯前先換掉的固定說法
     (re.compile(r"\bGame Highlights\b"), "比賽精華"),
     (re.compile(r"\bGame (\d+)\b"), r"第 \1 戰"),
 ]
+# 運動術語：Google 常翻錯，翻完後修正。（原文有這個英文，譯文裡的錯誤翻法 → 正確說法）
+# 只在原文真的有那個英文時才改，不會誤改別的句子；看到新的怪翻譯就加一行
+TERM_FIX = [
+    (r"\bwaiv", r"放棄|釋放|豁免", "釋出"),
+    (r"assists?[- ]leader|leading assist", r"助理隊長|協助王|助攻領袖|助攻領先者", "助攻王"),
+    (r"leading scorer|scoring leader", r"得分領袖|得分領先者", "得分王"),
+    (r"season[- ]opener", r"賽季揭幕戰|揭幕戰|賽季開幕戰|初戰", "開幕戰"),
+    (r"\bbuyout|bought out", r"收購", "買斷"),
+    (r"two-way", r"雙向合同|雙向契約|雙路合約|雙向協議", "雙向合約"),
+    (r"exhibit[- ]10", r"展品 ?10|附件 ?10|展覽 ?10", "Exhibit 10"),
+    (r"no-trade", r"無交易條款|禁止交易條款|不交易條款", "不可交易條款"),
+    (r"player option", r"玩家選擇權|球員選擇權|玩家選項", "球員選項"),
+    (r"(?:team|club) option", r"球隊選擇權|俱樂部選擇權|俱樂部選項|團隊選項|團隊選擇權", "球隊選項"),
+    (r"opt[- ]out", r"選擇退出條款|選擇退出|退出條款", "跳出條款"),
+    (r"mid-level", r"中級例外|中級異常|中層例外|中級豁免|中檔例外", "中產特例"),
+    (r"\bmax(?:imum)? (?:contract|deal|extension)", r"最高合約|最大合約|最大延期", "頂薪合約"),
+    (r"supermax", r"超級最大值|超級最大", "超級頂薪"),
+    (r"\bextension\b", r"延期", "延長合約"),
+    (r"free agen", r"免費代理人?|自由代理人?|自由經紀人", "自由球員"),
+    (r"triple-double", r"三雙", "大三元"),
+    (r"double-double", r"兩雙", "雙十"),
+    (r"buzzer[- ]beater", r"蜂鳴器|蜂鳴聲", "絕殺"),
+    (r"G League", r"G ?聯賽|G ?聯盟", "發展聯盟"),
+    (r"\bplay-in", r"入場賽|附加比賽|入圍賽", "附加賽"),
+    (r"sixth man", r"第六名", "第六人"),
+    (r"\bdunk", r"扣籃", "灌籃"),
+    (r"\bflagrant", r"公然犯規|明顯犯規", "惡意犯規"),
+    (r"\bguards?\b", r"守衛|警衛", "後衛"),
+    (r"\bcent(?:er|re)s?\b", r"中心(?!點)", "中鋒"),
+    (r"\bforwards?\b", r"轉發|向前", "前鋒"),
+]
+TERM_FIX = [(re.compile(s, re.I), re.compile(w), r) for s, w, r in TERM_FIX]
 # 文章沒標記到的人名：連續 2~4 個大寫開頭的字；含下列常見字的不算人名
 NAME_LIKE = re.compile(r"(?<![\w'’])[A-Z][a-z'’.-]+(?: +(?:[A-Z][a-z'’.-]+|Jr\.?|Sr\.?|II|III|IV)){1,3}(?![\w'’])")
 CJK_LATIN = (re.compile(r"([一-鿿])([A-Za-z0-9])"), re.compile(r"([A-Za-z0-9.])([一-鿿])"))
@@ -345,7 +378,7 @@ async def google_translate(session: aiohttp.ClientSession, text: str) -> list:
                 resp.raise_for_status()
                 return await resp.json(content_type=None)
         except aiohttp.ClientResponseError as e:
-            if e.status not in (403, 429):
+            if e.status not in (403, 429, 500, 502, 503):  # 被擋或伺服器暫時故障：換下一個
                 raise
             if _translate_client[0] == n:  # 這個被擋了，之後都改用下一個
                 _translate_client[0] = (n + 1) % len(TRANSLATE_CLIENTS)
@@ -376,6 +409,11 @@ async def translate(session: aiohttp.ClientSession, text: str, keep=()) -> str:
                      lambda m: terms[int(m.group(1))] if int(m.group(1)) < len(terms) else m.group(0), out)
         if not out.strip() or "__N" in out:
             raise ValueError(f"翻譯結果異常：{out}")
+        for source, wrong, right in TERM_FIX:  # 修正 Google 翻錯的運動術語
+            if source.search(text):
+                out = wrong.sub(right, out)
+        out = re.sub(r"\b(Jr|Sr|St)。", r"\1.", out)  # Jr. 的句點不是句號
+        out = re.sub(r"(?<=[一-鿿]) +(?=[一-鿿])", "", out)  # 換掉術語後，中文之間不留空格
         for pattern in CJK_LATIN:  # 中文和英文、數字之間加空格比較好讀
             out = pattern.sub(r"\1 \2", out)
     except Exception as e:
@@ -429,20 +467,53 @@ TX_VERB_ZH = {  # 異動敘述開頭的動詞
 }
 POS_ZH = {"PG": "控球後衛", "SG": "得分後衛", "SF": "小前鋒", "PF": "大前鋒", "G": "後衛", "F": "前鋒",
           "C": "中鋒", "G-F": "後衛/前鋒", "F-G": "前鋒/後衛", "F-C": "前鋒/中鋒", "C-F": "中鋒/前鋒"}
-POS_BEFORE_NAME = re.compile(r"\b(PG|SG|SF|PF|G-F|F-G|F-C|C-F|G|F|C)\s+(?=[A-Z])")
+POS_ZH.update({"Gs": "後衛", "Fs": "前鋒", "Cs": "中鋒"})  # 好幾位球員：Waived Gs A, B and C
+POS_BEFORE_NAME = re.compile(r"\b(PG|SG|SF|PF|G-F|F-G|F-C|C-F|Gs|Fs|Cs|G|F|C)\s+(?=[A-Z])")
+CONVERT_ZH = {"two-way": "雙向合約", "standard": "標準合約", "regular": "標準合約", "nba": "標準合約"}
+
+
+def who_zh(text: str) -> str:
+    """「Gs A, B and F C」→「後衛 A、B、前鋒 C」（人名保留英文）"""
+    text = POS_BEFORE_NAME.sub(lambda m: f"{POS_ZH[m.group(1)]} ", text)
+    return re.sub(r",?\s+and\s+|,\s+", "、", text)
+
+
+async def tx_sentence_zh(session: aiohttp.ClientSession, sentence: str, keep: set) -> str:
+    """一句異動 → 中文：常見句型直接對照（Google 常翻錯），其他的動詞自己翻、其餘交給 Google"""
+    s = re.sub(r"(?<!\bJr)(?<!\bSr)\.\s*$", "", sentence.strip())
+    m = re.match(r"^Converted (?:the contracts? of )?(?P<who>.+?)(?:['’]s? contracts?)?(?: from an? [\w-]+ contract)?"
+                 r" to (?:an? )?(?P<kind>[\w-]+)(?: NBA)? contracts?$", s, re.I)
+    if m and m["kind"].lower() in CONVERT_ZH:
+        return f"將 {who_zh(m['who'])} 的合約轉為{CONVERT_ZH[m['kind'].lower()]}"
+    m = re.match(r"^Claimed (?P<who>.+?) off waivers(?: from (?:the )?(?P<frm>.+))?$", s)
+    if m:
+        return f"從讓渡名單認領 {who_zh(m['who'])}" + (f"（原屬 {m['frm']}）" if m["frm"] else "")
+    m = re.match(r"^(?P<verb>Waived|Released) (?P<who>.+)$", s)
+    if m:
+        return f"釋出 {who_zh(m['who'])}"
+    m = re.match(r"^(?P<verb>Signed|Re-signed) (?P<who>.+?)(?: to an? (?P<rest>.+))?$", s)
+    if m:
+        kind = contract_type(s, "") if m["rest"] else ""
+        if m["rest"] is None or kind:
+            who = who_zh(m["who"])
+            done = f"簽下 {who}" if m["verb"] == "Signed" else f"與 {who} 續約"
+            return done + (f"（{kind}）" if kind else "")
+    first, _, rest = s.partition(" ")
+    verb = TX_VERB_ZH.get(first)
+    body = POS_BEFORE_NAME.sub(lambda x: f"{POS_ZH[x.group(1)]} ", rest if verb else s)
+    body = await translate(session, body, keep)  # 動詞自己翻，不讓 Google 改掉
+    return f"{verb} {body}" if verb else body
 
 
 async def translate_tx(session: aiohttp.ClientSession, tx: dict) -> None:
-    """異動敘述翻成中文：動詞、位置先自己翻，其他交給 Google；結果存在 zh() 用的快取"""
+    """異動敘述翻成中文：一句一句翻；結果存在 zh() 用的快取"""
     text = tx.get("description", "")
     if not text or text in _zh_cache:
         return
-    first, _, rest = text.partition(" ")
-    verb = TX_VERB_ZH.get(first)
-    body = POS_BEFORE_NAME.sub(lambda m: f"{POS_ZH[m.group(1)]} ", rest if verb else text)
-    body = re.sub(r"\s+off waivers from (?:the )?(.+?)\.?$", r"（原屬 \1）", body)
-    body = await translate(session, body.rstrip(". "), tx_terms(tx))  # 動詞自己翻，不讓 Google 改掉
-    _zh_cache[text] = f"{verb} {body}" if verb else body
+    keep = tx_terms(tx)
+    clean = re.sub(r"\b(Gs|Fs|Cs)\.\s+", r"\1 ", text)  # ESPN 偶爾寫成 Gs. Nate Johnson
+    parts = [await tx_sentence_zh(session, s, keep) for s in SENTENCE_SPLIT.split(clean)]
+    _zh_cache[text] = re.sub(r"(?<=[一-鿿]) +(?=[一-鿿])", "", "。".join(parts))  # 中文之間不留空格
 
 
 # ===== 小工具 =====
@@ -697,13 +768,16 @@ def group_trades(txs: list[dict]) -> list[list[dict]]:
     return groups
 
 
-def tx_message(group: list[dict]) -> tuple[str, discord.Embed]:
+def tx_message(group: list[dict], contracts: dict | None = None) -> tuple[str, discord.Embed]:
     label, color, _ = TX_KINDS.get(tx_kind(group[0]), ("📰 異動", 0x757575, ()))
     if len(group) == 1:
         description = zh(group[0].get("description", ""))
     else:
         description = "\n".join(f"**{team_name(t.get('team', {}).get('id')) or t.get('team', {}).get('displayName', '')}**："
                                 f"{zh(t.get('description', ''))}" for t in group)
+    money = [line for t in group for line in contract_lines(t.get("description", ""), contracts or {})]
+    if money:
+        description += "\n\n" + "\n".join(money)
     embed = discord.Embed(title=label, description=description[:4000], color=color)
     team = group[0].get("team") or {}
     if len(group) == 1 and team.get("id"):
@@ -716,6 +790,165 @@ def wanted_tx(tx: dict) -> bool:
     if tx_kind(tx) not in TX_TYPES or not follows(tx.get("team", {}).get("abbreviation", "")):
         return False
     return not (SKIP_MINOR_DEALS and MINOR_DEAL.search(tx.get("description", "")))
+
+
+# ===== 合約金額：官方異動沒有金額，從新聞標題記下「球員 → 金額」，簽約時附上；沒有金額就寫合約種類 =====
+CONTRACT_KEEP_DAYS = 150  # 新聞報的金額保留幾天（談妥到官方公布可能隔很久）
+NUM_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
+             "nine": 9, "ten": 10}
+CONTRACT_MONEY = re.compile(
+    r"(?:\b(?P<years>\d+|one|two|three|four|five|six|seven|eight|nine|ten)[- ]years?,?\s+(?:deal\s+worth\s+)?)?"
+    r"\$(?P<amount>\d+(?:\.\d+)?)\s*(?P<unit>million|billion|M|B)\b", re.I)
+CONTRACT_YEARS = re.compile(r"\b(?P<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)[- ]year\b", re.I)
+CONTRACT_WORDS = re.compile(r"\b(agree|agrees|agreed|sign|signs|signed|re-sign|extension|deal|contract|max)\b", re.I)
+CONTRACT_TYPES = [  # 異動敘述裡的合約種類 → 中文（由上往下找第一個符合的）
+    (r"two-way", "雙向合約"), (r"exhibit[- ]10", "Exhibit 10 合約（訓練營合約）"),
+    (r"10-day", "10 天短約"), (r"rest[- ]of[- ]season", "本季剩餘合約"),
+    (r"rookie[- ]scale(?: contract)? extension", "新秀合約延長"), (r"rookie[- ]scale|rookie contract", "新秀合約"),
+    (r"veteran(?:'s)? minimum", "老將底薪合約"), (r"\bminimum\b", "底薪合約"),
+    (r"veteran extension", "老將延長合約"), (r"\bmax(?:imum)? (?:contract|extension)", "頂薪合約"),
+    (r"multiyear (?:contract )?extension", "多年延長合約"),
+    (r"\b(?P<n>\d+)-year (?:contract )?extension", "{n} 年延長合約"), (r"\bextension\b", "延長合約"),
+    (r"minor league contract", "小聯盟合約"), (r"major league contract", "大聯盟合約"),
+    (r"\b(?P<n>\d+)-year", "{n} 年合約"), (r"\bone-year", "1 年合約"), (r"multiyear", "多年合約"),
+    (r"standard contract", "標準合約"),
+]
+CONTRACT_TYPES = [(re.compile(p, re.I), t) for p, t in CONTRACT_TYPES]
+SIGN_VERBS = ("Signed", "Re-signed", "Agreed", "Extended", "Converted")
+SENTENCE_SPLIT = re.compile(r"(?<!\bJr)(?<!\bSr)\.\s+(?=(?:" + "|".join(TX_VERB_ZH) + r")\b)")
+# 沒寫位置的球員（例如 Signed Carson Cooper to a two-way contract）
+SIGNED_NAME = re.compile(r"^\S+\s+(?:the contract of\s+)?((?:[A-Z][\w'’-]*|Jr\.?|Sr\.?|II|III|IV)"
+                         r"(?:\s+(?:[A-Z][\w'’-]*|Jr\.?|Sr\.?|II|III|IV|de|van|da))+)")
+
+
+def norm_name(name: str) -> str:
+    """比對球員名字用：去掉重音符號、大小寫、標點（Velázquez = Velazquez）"""
+    text = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z ]", "", text.lower()).strip()
+
+
+def money_zh(amount: float) -> str:
+    if amount >= 1e8:
+        return f"{amount / 1e8:.2f}".rstrip("0").rstrip(".") + " 億美元"
+    return f"{amount / 1e4:,.0f} 萬美元"
+
+
+# 新聞裡寫到的簽約方式、附帶條款（同一組只取第一個符合的，例如寫了非納稅中產就不再寫中產）
+CONTRACT_DETAILS = [  # (分類, 組, 英文, 中文)；分類 how = 簽約方式、terms = 附帶條款
+    ("how", "mle", r"non-taxpayer mid-level", "非納稅中產特例"),
+    ("how", "mle", r"taxpayer mid-level", "納稅中產特例"),
+    ("how", "mle", r"room (?:mid-level )?exception", "空間中產特例"),
+    ("how", "mle", r"mid-level exception|\bMLE\b", "中產特例"),
+    ("how", "bae", r"bi-annual exception", "雙年特例"),
+    ("how", "min", r"veteran(?:'s)? minimum", "老將底薪"),
+    ("how", "min", r"\b(?:league )?minimum (?:contract|deal|salary)", "底薪"),
+    ("how", "max", r"supermax|designated veteran", "超級頂薪"),
+    ("how", "max", r"rookie max|Rose Rule", "新秀頂薪"),
+    ("how", "max", r"\bmax(?:imum)? (?:contract|extension|deal)|\bfull max\b", "頂薪"),
+    ("how", "qo", r"qualifying offer", "合格報價"),
+    ("how", "sheet", r"offer sheet", "報價單"),
+    ("how", "snt", r"sign-and-trade", "先簽後換"),
+    ("how", "hard", r"hardship exception", "傷病特例"),
+    ("how", "arb", r"avoid(?:ed|ing)? arbitration|arbitration", "薪資仲裁相關"),
+    ("terms", "po", r"player option", "球員選項"),
+    ("terms", "to", r"(?:team|club) option", "球隊選項"),
+    ("terms", "mo", r"mutual option", "雙方選項"),
+    ("terms", "vo", r"vesting option", "達標生效選項"),
+    ("terms", "oo", r"opt[- ]outs?\b", "跳出條款"),
+    ("terms", "ntc", r"full no-trade", "完整不可交易條款"),
+    ("terms", "ntc", r"(?:partial|limited) no-trade|no-trade protection", "部分不可交易條款"),
+    ("terms", "ntc", r"no-trade", "不可交易條款"),
+    ("terms", "tk", r"trade kicker", "交易獎金"),
+    ("terms", "sb", r"signing bonus", "簽約獎金"),
+    ("terms", "def", r"deferr", "延遲支付"),
+    ("terms", "gtd", r"fully guaranteed", "全額保障"),
+    ("terms", "gtd", r"partially guaranteed", "部分保障"),
+    ("terms", "gtd", r"non-guaranteed", "非保障"),
+    ("terms", "inc", r"incentive", "附激勵獎金"),
+]
+CONTRACT_DETAILS = [(kind, group, re.compile(p, re.I), zh_text) for kind, group, p, zh_text in CONTRACT_DETAILS]
+
+
+def contract_details(text: str) -> dict:
+    found, used = {"how": [], "terms": []}, set()
+    for kind, group, pattern, zh_text in CONTRACT_DETAILS:
+        if group not in used and pattern.search(text):
+            used.add(group)
+            found[kind].append(zh_text)
+    return found
+
+
+def remember_contracts(state: dict, articles: list[dict]) -> None:
+    """新聞寫到合約的，記下 {球員: 金額、簽約方式、附帶條款}；只記新聞明確寫到的，不推測"""
+    book = state.setdefault("contracts", {})
+    now = time.time()
+    for a in articles:
+        headline, desc = a.get("headline") or "", a.get("description") or ""
+        if not CONTRACT_WORDS.search(headline):
+            continue
+        text = headline
+        m = CONTRACT_MONEY.search(headline)
+        if not m:
+            text, m = desc, CONTRACT_MONEY.search(desc)
+        details = contract_details(headline + " " + desc)
+        if not m and not details["how"] and not details["terms"]:
+            continue
+        players = [c.get("description", "") for c in a.get("categories") or []
+                   if c.get("type") == "athlete" and c.get("description")]
+        named = [p for p in players if re.sub(r"\s+(Jr\.?|Sr\.?|II|III|IV)$", "", p).split()[-1] in headline]
+        named = named or (players if len(players) == 1 else [])
+        money = None
+        if m:
+            # 年數可能寫在金額後面（$1 million, 1-year deal）
+            y = m["years"] or (CONTRACT_YEARS.search(text) or {"n": None})["n"]
+            years = y and (NUM_WORDS.get(y.lower()) or int(y))
+            amount = float(m["amount"]) * (1e9 if m["unit"].lower().startswith("b") else 1e6)
+            money = f"{years} 年 {money_zh(amount)}" if years else money_zh(amount)
+        for p in named:
+            entry = book.setdefault(norm_name(p), {})
+            if money:
+                entry["text"] = money
+            for kind in ("how", "terms"):  # 同一個球員好幾則新聞：條款合併
+                entry[kind] = list(dict.fromkeys(entry.get(kind, []) + details[kind]))
+            entry["t"] = now
+    for k in [k for k, v in book.items() if now - v.get("t", 0) > CONTRACT_KEEP_DAYS * 86400]:
+        del book[k]
+
+
+def contract_extra(entry: dict) -> list[str]:
+    """簽約方式、附帶條款各一行（新聞有寫才有）"""
+    lines = []
+    if entry.get("how"):
+        lines.append(f"　🏷️ 簽約方式：{'、'.join(entry['how'])}")
+    if entry.get("terms"):
+        lines.append(f"　📑 附帶：{'、'.join(entry['terms'])}")
+    return lines
+
+
+def contract_type(sentence: str, default: str) -> str:
+    for pattern, zh_type in CONTRACT_TYPES:
+        m = pattern.search(sentence)
+        if m:
+            return zh_type.format(**m.groupdict())
+    return default
+
+
+def contract_lines(description: str, book: dict) -> list[str]:
+    """簽約、續約的每位球員一行：有報導金額就附金額，沒有就寫合約種類"""
+    lines = []
+    for sentence in SENTENCE_SPLIT.split(description):
+        if sentence.split(" ", 1)[0] not in SIGN_VERBS:
+            continue
+        kind = contract_type(sentence, "一般合約")
+        names = TX_NAME.findall(sentence) or SIGNED_NAME.findall(sentence)
+        for name in names:
+            name = re.sub(r"(?<!Jr)(?<!Sr)\.$", "", re.sub(r"['’]s$", "", name.strip()))
+            entry = book.get(norm_name(name)) or {}
+            money = entry.get("text")
+            lines.append(f"💰 {name}：{kind}｜{money}（依 ESPN 報導）" if money
+                         else f"📄 {name}：{kind}（金額未公開）")
+            lines += contract_extra(entry)
+    return lines
 
 
 def season_label(season: int) -> str:
@@ -1120,7 +1353,7 @@ async def bracket_image(session: aiohttp.ClientSession, season: int, date: str) 
         return next((i for i, w in sr["wins"].items() if w >= need), None) if sr else None
 
     def box(sr: dict | None, feeders: list[str | None] | None = None, seeds: bool = False,
-            final: bool = False) -> bracket.Box:
+            final: bool = False) -> "bracket.Box":
         if not sr:  # 還沒排出對戰：放已經晉級的球隊，其他待定
             return bracket.Box([bracket.Team(info[i]["abbr"], logos.get(i)) if i else bracket.Team()
                                 for i in (feeders or [None, None])])
@@ -1319,10 +1552,19 @@ async def tx_updates(session: aiohttp.ClientSession, state: dict, initial: bool)
     new_txs = [t for t in await fetch_transactions(session)
                if wanted_tx(t) and tx_id(t) not in seen]
     state["tx"] += [tx_id(t) for t in new_txs]
+    # 篩選設定改了（例如開始發雙向合約）：這次只記錄目前的異動，不補發以前被略過的
+    tx_filter = f"{sorted(TX_TYPES)}|{SKIP_MINOR_DEALS}|{sorted(FOLLOW_TEAMS)}"
+    if state.get("tx_filter") != tx_filter:
+        initial = True
+        state["tx_filter"] = tx_filter
+    try:  # 先從最新的新聞記下合約金額（簽約時附上）
+        remember_contracts(state, await fetch_news(session))
+    except Exception as e:
+        print(f"⚠️ 從新聞找合約金額失敗：{e}")
     if initial:
         return []
     await asyncio.gather(*(translate_tx(session, t) for t in new_txs))
-    return [tx_message(group) for group in group_trades(new_txs)]
+    return [tx_message(group, state.get("contracts")) for group in group_trades(new_txs)]
 
 
 async def news_updates(session: aiohttp.ClientSession, state: dict, initial: bool) -> list:
