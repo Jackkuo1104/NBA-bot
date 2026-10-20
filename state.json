@@ -27,7 +27,11 @@
     "2026-10-17|26|Claimed C Tony Bradley off waivers. Converted the contract of F Harrison Ingram to a twpo-way contract. Waived C Jonas Aidoo and G Tamar Bates.",
     "2026-10-19|25|Signed G Cason Wallace to a rookie-scale contract extension.",
     "2026-10-19|25|Re-signed G Cason Wallace to a rookie-scale contract extension.",
-    "2026-10-19|30|Signed G Brandon Miller to a multiyear contract extension."
+    "2026-10-19|30|Signed G Brandon Miller to a multiyear contract extension.",
+    "2026-10-17|2|Converted the contract of G Devin Carter to a two-way contract. Waived Fs Tucker Devries, Gabe McGlothan, Gs Hayden Gray and Milos Uzan.",
+    "2026-10-17|12|Signed G Cam Christie to a two-way contract. Waived Gs Miye Oni, Jahmyl Telfort and Blake Wesley.",
+    "2026-10-17|28|Converted the contract of C Nate Bittle to a two-way contract. Waived Gs Nimari Burnett, Jalen Celestine, Tyreke Key, F Tyson Degenhart and C Jamarion Sharp.",
+    "2026-10-19|21|Signed F Oso Ighodaro to a multiyear contract extension. Claimed F Drew Timme off waivers. Converted C Duop Reath's contract to a two-way contract. Waived F CJ Huntley and G Koby Brea."
   ],
   "news": [
     "50151066",
@@ -132,12 +136,27 @@
   "honors_checked": 1792476327.8129957,
   "draft": {
     "year": 2027,
-    "checked": 1792473637.0157516
+    "checked": 1792477457.2453787
   },
   "health": {},
   "season": {
     "v": 3,
     "post_days": [],
     "post_ready": {}
+  },
+  "tx_filter": "['claim', 'sign', 'trade']|False|[]",
+  "contracts": {
+    "jaden mcdaniels": {
+      "text": "1 年 4,000 萬美元",
+      "how": [],
+      "terms": [],
+      "t": 1792477457.2089634
+    },
+    "brandon miller": {
+      "text": "5 年 2.09 億美元",
+      "how": [],
+      "terms": [],
+      "t": 1792477457.2089634
+    }
   }
 }
