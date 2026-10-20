@@ -6,8 +6,8 @@
       "periods": 4
     },
     "401909089": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909090": {
@@ -158,13 +158,13 @@
       "text": "1 年 4,000 萬美元",
       "how": [],
       "terms": [],
-      "t": 1792538126.6580951
+      "t": 1792538431.5916858
     },
     "brandon miller": {
       "text": "5 年 2.09 億美元",
       "how": [],
       "terms": [],
-      "t": 1792538126.6580951
+      "t": 1792538431.5916858
     }
   }
 }
