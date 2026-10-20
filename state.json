@@ -2,8 +2,8 @@
   "games": {
     "401909088": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 0
+      "status": "STATUS_END_PERIOD",
+      "periods": 1
     },
     "401909089": {
       "state": "pre",
@@ -154,13 +154,13 @@
       "text": "1 年 4,000 萬美元",
       "how": [],
       "terms": [],
-      "t": 1792524639.8138752
+      "t": 1792524924.7313666
     },
     "brandon miller": {
       "text": "5 年 2.09 億美元",
       "how": [],
       "terms": [],
-      "t": 1792524639.8138752
+      "t": 1792524924.7313666
     }
   }
 }
