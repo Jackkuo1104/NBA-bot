@@ -12,7 +12,7 @@
     },
     "401909090": {
       "state": "in",
-      "status": "STATUS_HALFTIME",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 2
     }
   },
@@ -161,13 +161,13 @@
       "text": "1 年 4,000 萬美元",
       "how": [],
       "terms": [],
-      "t": 1792552230.91194
+      "t": 1792552526.2516656
     },
     "brandon miller": {
       "text": "5 年 2.09 億美元",
       "how": [],
       "terms": [],
-      "t": 1792552230.91194
+      "t": 1792552526.2516656
     }
   }
 }
