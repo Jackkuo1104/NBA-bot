@@ -6,9 +6,9 @@
       "periods": 4
     },
     "401909094": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401909848": {
       "state": "pre",
@@ -77,7 +77,8 @@
     "2026-10-15",
     "2026-10-16",
     "2026-10-20",
-    "2026-10-21"
+    "2026-10-21",
+    "2026-10-22"
   ],
   "tx": [
     "2026-10-16|2|Re-signed G Payton Pritchard to a veteran extension.",
@@ -220,13 +221,13 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1792727429.6677117,
+  "awards_checked": 1792729523.7272878,
   "shams": [
     "50176173",
     "50239169"
   ],
   "honors": [],
-  "honors_checked": 1792727429.9466481,
+  "honors_checked": 1792729523.804275,
   "draft": {
     "year": 2027,
     "checked": 1792725923.9494576
