@@ -47,27 +47,27 @@
     },
     "401909096": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 0
-    },
-    "401909849": {
-      "state": "in",
       "status": "STATUS_END_PERIOD",
       "periods": 1
     },
+    "401909849": {
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
+      "periods": 1
+    },
     "401909850": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909851": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909852": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     }
   },
@@ -170,7 +170,8 @@
     "50255686",
     "50258240",
     "50262186",
-    "50262142"
+    "50262142",
+    "50262518"
   ],
   "awards": [
     "2026:33:4278073:25",
@@ -226,14 +227,14 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1792806032.82867,
+  "awards_checked": 1792808139.4945333,
   "shams": [
     "50176173",
     "50239169",
     "50258464"
   ],
   "honors": [],
-  "honors_checked": 1792806032.9609325,
+  "honors_checked": 1792808139.7042131,
   "draft": {
     "year": 2027,
     "checked": 1792806032.9609492
