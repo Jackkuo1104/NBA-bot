@@ -41,9 +41,9 @@
       "periods": 4
     },
     "401909847": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401909096": {
       "state": "in",
@@ -63,7 +63,7 @@
     "401909851": {
       "state": "in",
       "status": "STATUS_IN_PROGRESS",
-      "periods": 0
+      "periods": 1
     },
     "401909852": {
       "state": "in",
@@ -89,7 +89,8 @@
     "2026-10-17|2|Converted the contract of G Devin Carter to a two-way contract. Waived Fs Tucker Devries, Gabe McGlothan, Gs Hayden Gray and Milos Uzan.",
     "2026-10-17|12|Signed G Cam Christie to a two-way contract. Waived Gs Miye Oni, Jahmyl Telfort and Blake Wesley.",
     "2026-10-17|28|Converted the contract of C Nate Bittle to a two-way contract. Waived Gs Nimari Burnett, Jalen Celestine, Tyreke Key, F Tyson Degenhart and C Jamarion Sharp.",
-    "2026-10-19|21|Signed F Oso Ighodaro to a multiyear contract extension. Claimed F Drew Timme off waivers. Converted C Duop Reath's contract to a two-way contract. Waived F CJ Huntley and G Koby Brea."
+    "2026-10-19|21|Signed F Oso Ighodaro to a multiyear contract extension. Claimed F Drew Timme off waivers. Converted C Duop Reath's contract to a two-way contract. Waived F CJ Huntley and G Koby Brea.",
+    "2026-10-23|23|Signed G Sean Pedulla to a two-way contract."
   ],
   "news": [
     "50151066",
