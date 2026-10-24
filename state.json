@@ -1,15 +1,5 @@
 {
   "games": {
-    "401909093": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909094": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
     "401909848": {
       "state": "post",
       "status": "STATUS_FINAL",
@@ -63,12 +53,52 @@
     "401909851": {
       "state": "in",
       "status": "STATUS_IN_PROGRESS",
-      "periods": 2
+      "periods": 3
     },
     "401909852": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 2
+      "status": "STATUS_END_PERIOD",
+      "periods": 3
+    },
+    "401909853": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909854": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909855": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909857": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909858": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909856": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909859": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909860": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     }
   },
   "days_done": [
@@ -229,14 +259,14 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1792812328.6499991,
+  "awards_checked": 1792814430.9604776,
   "shams": [
     "50176173",
     "50239169",
     "50258464"
   ],
   "honors": [],
-  "honors_checked": 1792812328.7699072,
+  "honors_checked": 1792814431.2170904,
   "draft": {
     "year": 2027,
     "checked": 1792813828.1249824
