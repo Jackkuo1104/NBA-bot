@@ -17,7 +17,7 @@
     },
     "401909095": {
       "state": "in",
-      "status": "STATUS_HALFTIME",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 2
     },
     "401909843": {
@@ -224,17 +224,17 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1792800044.9535635,
+  "awards_checked": 1792802125.6987598,
   "shams": [
     "50176173",
     "50239169",
     "50258464"
   ],
   "honors": [],
-  "honors_checked": 1792800045.0797606,
+  "honors_checked": 1792802125.8795116,
   "draft": {
     "year": 2027,
-    "checked": 1792798238.9522493
+    "checked": 1792802125.8795283
   },
   "health": {},
   "season": {
