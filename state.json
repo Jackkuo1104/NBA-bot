@@ -67,8 +67,8 @@
     },
     "401909854": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 1
+      "status": "STATUS_HALFTIME",
+      "periods": 2
     },
     "401909855": {
       "state": "in",
@@ -82,8 +82,8 @@
     },
     "401909858": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 0
+      "status": "STATUS_END_PERIOD",
+      "periods": 1
     },
     "401909856": {
       "state": "in",
