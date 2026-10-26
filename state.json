@@ -276,7 +276,12 @@
     "year": 2027,
     "checked": 1793021125.9664285
   },
-  "health": {},
+  "health": {
+    "比分": {
+      "since": 1793023832.8422043,
+      "error": "200, message='Attempt to decode JSON with unexpected mimetype: ', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261026'"
+    }
+  },
   "season": {
     "v": 3,
     "post_days": [],
