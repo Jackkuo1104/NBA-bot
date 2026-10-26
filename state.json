@@ -51,14 +51,14 @@
       "periods": 4
     },
     "401909863": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401909864": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401909865": {
       "state": "post",
@@ -67,13 +67,13 @@
     },
     "401909866": {
       "state": "in",
-      "status": "STATUS_END_PERIOD",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 3
     },
     "401909867": {
       "state": "in",
       "status": "STATUS_IN_PROGRESS",
-      "periods": 0
+      "periods": 1
     }
   },
   "days_done": [
@@ -253,7 +253,7 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1792976725.3552992,
+  "awards_checked": 1792978827.6527278,
   "shams": [
     "50176173",
     "50239169",
@@ -261,7 +261,7 @@
     "50266620"
   ],
   "honors": [],
-  "honors_checked": 1792976725.47959,
+  "honors_checked": 1792978827.7215142,
   "draft": {
     "year": 2027,
     "checked": 1792976016.5942252
