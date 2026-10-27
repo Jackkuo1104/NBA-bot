@@ -52,8 +52,19 @@ WIKI_API = "https://en.wikipedia.org/w/api.php"
 WIKI_HEADERS = {"User-Agent": "NBA-Discord-bot/1.0 (https://github.com/Jackkuo1104/NBA-bot)"}
 SHAMS_KEYWORD = "charania"  # 作者、標題或摘要含這個字的新聞當作 Shams 的消息
 # 標題或摘要符合這些字的新聞當作「紀錄」消息發送（不限 NEWS_TYPES）
-RECORD_NEWS = re.compile(r"\brecords?\b|record-breaking|all-time|first player|"
-                         r"NBA history|franchise history", re.I)
+# 只認「破／追平紀錄」這類說法；record 當動詞（record his first bucket）或戰績（road record）不算
+RECORD_NEWS = re.compile(r"\b(?:set|sets|setting|break|breaks|breaking|broke|tie|ties|tying|tied|extend|extends|"
+                         r"extended)\b[^.]{0,30}?\brecords?\b|record-(?:breaking|setting|tying)|"
+                         r"\b(?:franchise|league|NBA|all-time|single-game|single-season|playoff|career|world) "
+                         r"records?\b|\ball-time\b|first player|NBA history|franchise history", re.I)
+# 標題有這些字才標成「重大消息」（交易、簽約、傷病、禁賽、人事異動…），其他的標成一般新聞
+BIG_NEWS = re.compile(r"^(?:Sources?|Breaking)\b|\btrade[sd]?\b|\btrading\b|\bsign(?:s|ed|ing)?\b|\bagree[sd]?\b|"
+                      r"\bcontract|\bextension|\bwaive|\breleased?\b|\bbuyout|\binjur|\bsurgery|\btorn\b|\btears?\b|"
+                      r"\bfractur|\bsprain|\bstrain|\bconcussion|\bout (?:for|indefinitely|as)\b|\bruled out\b|"
+                      r"\b(?:to|will) miss\b|\bsidelined\b|\bsuspen|\bfined\b|\bbann?ed\b|\barrest|\bcharged\b|"
+                      r"\bfire[sd]?\b|\bhire[sd]?\b|\bnamed?\b|\bretir|\bdie[sd]\b|\bdeath\b|\bpassed away\b|"
+                      r"\breturn(?:s|ing)? as\b|\bresign|\bsteps? down\b|\bdraft pick|\bfree agen", re.I)
+BIG_NEWS_SOURCES = re.compile(r"\bsources? (?:say|said|told|tell)", re.I)  # 摘要寫「消息人士告訴 ESPN」也算
 STATE_FILE = "state.json"
 SEEN_LIMIT = 500  # 只保留最近的 ID，避免檔案無限變大
 TW = timezone(timedelta(hours=8))
@@ -300,9 +311,13 @@ TERM_FIX = [
     (r"\bwaiv", r"放棄|釋放|豁免", "釋出"),
     (r"assists?[- ]leader|leading assist", r"助理隊長|協助王|助攻領袖|助攻領先者", "助攻王"),
     (r"leading scorer|scoring leader", r"得分領袖|得分領先者", "得分王"),
-    (r"season[- ]opener", r"賽季揭幕戰|揭幕戰|賽季開幕戰|初戰", "開幕戰"),
+    (r"^Sources?:", r"^(?:消息)?來源：|^資料來源：", "消息人士："),
+    (r"\bopener\b", r"本賽季(?:揭幕|開幕)戰", "本季開幕戰"),
+    (r"\bopener\b", r"賽季揭幕戰|揭幕戰|賽季開幕戰|初戰|開局", "開幕戰"),
+    (r"\bout as\b", r"出任", "卸任"),
     (r"\bbuyout|bought out", r"收購", "買斷"),
-    (r"two-way", r"雙向合同|雙向契約|雙路合約|雙向協議", "雙向合約"),
+    (r"two-way", r"進行雙向(?:交易|合同|協議)", "簽下雙向合約"),
+    (r"two-way", r"雙向合同|雙向契約|雙路合約|雙向協議|雙向交易", "雙向合約"),
     (r"exhibit[- ]10", r"展品 ?10|附件 ?10|展覽 ?10", "Exhibit 10"),
     (r"no-trade", r"無交易條款|禁止交易條款|不交易條款", "不可交易條款"),
     (r"player option", r"玩家選擇權|球員選擇權|玩家選項", "球員選項"),
@@ -324,30 +339,16 @@ TERM_FIX = [
     (r"\bguards?\b", r"守衛|警衛", "後衛"),
     (r"\bcent(?:er|re)s?\b", r"中心(?!點)", "中鋒"),
     (r"\bforwards?\b", r"轉發|向前", "前鋒"),
+    (r"\bshots?\b", r"桿", "投"),
+    (r"\bblock(?:s|ed)?\b", r"蓋帽|封蓋", "阻攻"),
+    (r"\bsteals?\b", r"搶斷", "抄截"),
+    (r"regular season", r"常規賽", "例行賽"),
+    (r"\bowner", r"所有者|擁有者", "老闆"),
+    (r"front office", r"前台|前辦公室", "球團"),
+    (r"\bteam", r"團隊", "球隊"),
 ]
 TERM_FIX = [(re.compile(s, re.I), re.compile(w), r) for s, w, r in TERM_FIX]
-# 文章沒標記到的人名：連續 2~4 個大寫開頭的字；含下列常見字的不算人名
-NAME_LIKE = re.compile(r"(?<![\w'’])[A-Z][a-z'’.-]+(?: +(?:[A-Z][a-z'’.-]+|Jr\.?|Sr\.?|II|III|IV)){1,3}(?![\w'’])")
 CJK_LATIN = (re.compile(r"([一-鿿])([A-Za-z0-9])"), re.compile(r"([A-Za-z0-9.])([一-鿿])"))
-NOT_NAME = set("""a an the and or of in on at to for with from by vs after before as is are was
-game games highlights east west eastern western semifinals finals final conference most valuable
-player players week month year rookie defensive all star league cup draft trade trades free agent
-summer preseason season playoffs playoff day night monday tuesday wednesday thursday friday saturday
-sunday january february march april may june july august september october november december award
-awards team teams first second third world series american national division wild card opening spring
-training hall fame gold glove silver slugger fantasy basketball baseball mock points power rankings now
-later new era takeaways updates update latest news what why how who which when where takeaway sources
-source report reports breaking live recap preview analysis grades grade best worst top big early late
-manager coach coaches general president owner front office mvp""".split())
-
-
-def guess_names(text: str) -> set[str]:
-    names = set()
-    for m in NAME_LIKE.finditer(text or ""):
-        words = m.group(0).split()
-        if not any(w.lower().strip(".'’") in NOT_NAME for w in words):
-            names |= person_terms(m.group(0))
-    return names
 
 
 def person_terms(*names: str) -> set[str]:
@@ -360,6 +361,9 @@ def person_terms(*names: str) -> set[str]:
             last = re.sub(r"\s+(Jr\.?|Sr\.?|II|III|IV)$", "", name).split()[-1]
             if len(last) >= 3:
                 terms.add(last)
+            first = name.split()[0]
+            if re.search(r"[a-z][A-Z]", first):  # LeBron、LaMelo 這種名字也常單獨出現
+                terms.add(first)
     return terms
 
 
@@ -413,7 +417,10 @@ async def translate(session: aiohttp.ClientSession, text: str, keep=()) -> str:
             if source.search(text):
                 out = wrong.sub(right, out)
         out = re.sub(r"\b(Jr|Sr|St)。", r"\1.", out)  # Jr. 的句點不是句號
-        out = re.sub(r"(?<=[一-鿿]) +(?=[一-鿿])", "", out)  # 換掉術語後，中文之間不留空格
+        # 保留英文的名字後面的所有格：Paul George's 首秀 → Paul George 的首秀、Spurs' → Spurs 的
+        out = re.sub(r"([A-Za-z])(?:['’]s|(s)['’])(?=[\s「“\"一-鿿]|$)",
+                     lambda m: m.group(1) + (m.group(2) or "") + " 的", out)
+        out = re.sub(r"(?<=[一-鿿]) +(?=[一-鿿「“])", "", out)  # 換掉術語後，中文之間不留空格
         for pattern in CJK_LATIN:  # 中文和英文、數字之間加空格比較好讀
             out = pattern.sub(r"\1 \2", out)
     except Exception as e:
@@ -432,26 +439,6 @@ def zh(text: str) -> str:
 
 async def prefetch(session: aiohttp.ClientSession, texts, keep=()) -> None:
     await asyncio.gather(*(translate(session, t, keep) for t in set(texts) if t))
-
-
-async def zh_article(session: aiohttp.ClientSession, article: dict) -> dict:
-    """新聞標題和摘要翻成中文；文章標記的球員、教練、球隊名稱保留英文"""
-    keep = set()
-    for line in f"{article.get('headline') or ''}\n{article.get('description') or ''}".splitlines():
-        keep |= guess_names(line)
-    for c in article.get("categories") or []:
-        if c.get("type") in ("athlete", "coach", "person"):
-            keep |= person_terms(c.get("description", ""))
-        elif c.get("type") == "team" and c.get("description"):
-            keep.add(c["description"])
-    out = dict(article)
-    for key in ("headline", "description"):
-        out[key] = await translate(session, article.get(key) or "", keep)
-    return out
-
-
-async def zh_articles(session: aiohttp.ClientSession, articles: list[dict]) -> list[dict]:
-    return list(await asyncio.gather(*(zh_article(session, a) for a in articles)))
 
 
 def tx_terms(tx: dict) -> set[str]:
@@ -1104,8 +1091,15 @@ def wanted_news(article: dict) -> bool:
     return (article.get("type") in NEWS_TYPES or is_record(article)) and not is_shams(article)
 
 
+def is_big(article: dict) -> bool:
+    return bool(BIG_NEWS.search(article.get("headline") or "")
+                or BIG_NEWS_SOURCES.search(article.get("description") or ""))
+
+
 def news_label(article: dict) -> str:
-    return "📊 **NBA 紀錄**" if is_record(article) else "🚨 **NBA 重大消息**"
+    if is_record(article):
+        return "📊 **NBA 紀錄**"
+    return "🚨 **NBA 重大消息**" if is_big(article) else "📰 **NBA 新聞**"
 
 
 def news_embed(article: dict) -> discord.Embed:
@@ -1575,8 +1569,7 @@ async def news_updates(session: aiohttp.ClientSession, state: dict, initial: boo
     state["news"] += [article_id(a) for a in new_articles]
     if initial:
         return []
-    # 用英文原文判斷是不是紀錄類新聞，再發翻譯後的內容
-    return [(news_label(a), news_embed(z)) for a, z in zip(new_articles, await zh_articles(session, new_articles))]
+    return [(news_label(a), news_embed(a)) for a in new_articles]  # 新聞直接發英文原文
 
 
 async def shams_updates(session: aiohttp.ClientSession, state: dict, initial: bool) -> list:
@@ -1588,7 +1581,7 @@ async def shams_updates(session: aiohttp.ClientSession, state: dict, initial: bo
     state["shams"] += [article_id(a) for a in new_articles]
     if initial:
         return []
-    return [("🚨 **Shams 最新消息**", news_embed(a)) for a in await zh_articles(session, new_articles)]
+    return [("🚨 **Shams 最新消息**", news_embed(a)) for a in new_articles]
 
 
 async def award_updates(session: aiohttp.ClientSession, state: dict, initial: bool) -> list:
@@ -2041,8 +2034,7 @@ async def news_command(interaction: discord.Interaction,
     if not articles:
         await interaction.followup.send("ESPN 最近 50 則新聞裡沒有重大消息。")
         return
-    articles = await zh_articles(bot.session, articles[:count])
-    await interaction.followup.send(embeds=[news_embed(a) for a in articles])
+    await interaction.followup.send(embeds=[news_embed(a) for a in articles[:count]])
 
 
 @bot.tree.command(name="shams", description="查看最近的 Shams 新聞")
@@ -2058,8 +2050,7 @@ async def shams_command(interaction: discord.Interaction,
     if not articles:
         await interaction.followup.send("ESPN 最近 50 則新聞裡沒有 Shams 的消息。")
         return
-    articles = await zh_articles(bot.session, articles[:count])
-    await interaction.followup.send(embeds=[news_embed(a) for a in articles])
+    await interaction.followup.send(embeds=[news_embed(a) for a in articles[:count]])
 
 
 @bot.tree.command(name="moves", description="查看最近的 NBA 簽約、交易")
