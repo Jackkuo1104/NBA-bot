@@ -277,14 +277,9 @@
   "honors_checked": 1793131831.1694825,
   "draft": {
     "year": 2027,
-    "checked": 1793128232.1053052
+    "checked": 1793132130.0943916
   },
-  "health": {
-    "比分": {
-      "since": 1793131829.8460119,
-      "error": "200, message='Attempt to decode JSON with unexpected mimetype: ', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261026'"
-    }
-  },
+  "health": {},
   "season": {
     "v": 3,
     "post_days": [],
