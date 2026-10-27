@@ -261,7 +261,7 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1793129725.4747643,
+  "awards_checked": 1793131830.5280993,
   "shams": [
     "50176173",
     "50239169",
@@ -274,12 +274,17 @@
   "honors": [
     "2027:players of the week:October 20–25"
   ],
-  "honors_checked": 1793129725.8312716,
+  "honors_checked": 1793131831.1694825,
   "draft": {
     "year": 2027,
     "checked": 1793128232.1053052
   },
-  "health": {},
+  "health": {
+    "比分": {
+      "since": 1793131829.8460119,
+      "error": "200, message='Attempt to decode JSON with unexpected mimetype: ', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261026'"
+    }
+  },
   "season": {
     "v": 3,
     "post_days": [],
