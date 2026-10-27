@@ -47,8 +47,8 @@
     },
     "401909870": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 1
+      "status": "STATUS_HALFTIME",
+      "periods": 2
     },
     "401909871": {
       "state": "in",
@@ -57,13 +57,13 @@
     },
     "401909872": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 0
+      "status": "STATUS_END_PERIOD",
+      "periods": 1
     },
     "401909873": {
       "state": "in",
       "status": "STATUS_IN_PROGRESS",
-      "periods": 0
+      "periods": 1
     },
     "401909874": {
       "state": "pre",
@@ -212,7 +212,8 @@
     "50288053",
     "50288799",
     "50289397",
-    "50290179"
+    "50290179",
+    "50292072"
   ],
   "awards": [
     "2026:33:4278073:25",
