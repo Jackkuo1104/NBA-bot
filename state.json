@@ -293,5 +293,20 @@
       "terms": [],
       "t": 1792557324.5714648
     }
-  }
+  },
+  "allstar": [
+    "2026:Celebrity Game",
+    "2026:Rising Stars Challenge",
+    "2026:Three Point Contest",
+    "2026:Shooting Stars",
+    "2026:Slam Dunk Contest"
+  ],
+  "allstar_events": [
+    "2026:Celebrity Game",
+    "2026:Rising Stars Challenge",
+    "2026:Three Point Contest",
+    "2026:Shooting Stars",
+    "2026:Slam Dunk Contest"
+  ],
+  "allstar_checked": 1793093097.1917815
 }
