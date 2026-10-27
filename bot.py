@@ -119,6 +119,17 @@ YEARLY_ZH = {  # 維基百科年度獎項表格裡、ESPN 沒有的獎項（其�
     "social justice": "年度社會正義冠軍獎",
     "hustle": "年度拼勁獎",
 }
+# 明星週的比賽項目每年不同，照當年明星賽維基百科頁面「All-Star Weekend」底下列的項目發；
+# 認得的項目用固定中文名稱，其他的用翻譯，標題都會附上當年的英文原名。明星賽 MVP 由 ESPN 獎項發送
+ALLSTAR_ZH = [
+    (r"rising stars", "新秀挑戰賽"), (r"skills", "技巧挑戰賽"), (r"shooting stars", "明星投籃賽"),
+    (r"three[- ]point|3-point", "三分球大賽"), (r"slam dunk|dunk contest", "灌籃大賽"),
+    (r"celebrity", "名人賽"), (r"\bhbcu\b", "HBCU 經典賽"),
+]
+ALLSTAR_MONTHS = (1, 2, 3)  # 項目 1 月到 2 月初公布、明星週在 2 月，只在 1～3 月檢查
+# 「All-Star Weekend」底下不是比賽的小節（電視節目、表演…）
+NOT_ALLSTAR_EVENT = re.compile(r"road show|media|broadcast|television|entertainment|performance|halftime|"
+                               r"anthem|practice|ticket|venue|sponsor", re.I)
 MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August",
           "September", "October", "November", "December")
 
@@ -265,6 +276,164 @@ async def wiki_parse(session: aiohttp.ClientSession, page: str, **params) -> dic
                            headers=WIKI_HEADERS, timeout=aiohttp.ClientTimeout(total=15)) as resp:
         resp.raise_for_status()
         return await resp.json()
+
+
+async def wiki_source(session: aiohttp.ClientSession, page: str) -> str:
+    """頁面的維基語法（去掉註解，[[連結|文字]] 換成 [[文字]]，表格格子裡就不會多出 |）；頁面還沒建立時回傳空字串"""
+    data = await wiki_parse(session, page, prop="wikitext", redirects="1")
+    if "error" in data:
+        return ""
+    text = re.sub(r"<!--.*?-->", "", data["parse"]["wikitext"], flags=re.S)
+    text = re.sub(r"\{\{sortname\|([^|}]+)\|([^|}]+)[^}]*\}\}", r"[[\1 \2]]", text, flags=re.I)
+    return re.sub(r"\[\[[^\]|]*\|([^\]]*)\]\]", r"[[\1]]", text)
+
+
+async def fetch_allstar(session: aiohttp.ClientSession, year: int) -> tuple[list[str], list[tuple[str, str, list]]]:
+    """當年明星賽頁面「All-Star Weekend」底下的每一項比賽（NBA 公布後維基百科才會列出來），
+    回傳 ([英文項目名稱], 已經比完的 [(英文項目名稱, 冠軍, [(人名, 球隊)])])"""
+    weekend = section_text(await wiki_source(session, f"{year} NBA All-Star Game"), "All-Star Weekend")
+    events = re.findall(r"^===\s*([^=\n]+?)\s*===\s*$(.*?)(?=^===?[^=]|\Z)", weekend, re.M | re.S)
+    events = [(h, b) for h, b in events if not NOT_ALLSTAR_EVENT.search(h)]
+    found = []
+    for heading, body in events:
+        for page, part in re.findall(r"\{\{#section:([^|}]+)\|([^|}]+)\}\}", body):  # 從別的頁面引用過來的段落
+            other = await wiki_source(session, page.strip())
+            part = re.escape(part.strip())
+            m = re.search(rf'<section begin="?{part}"?\s*/>(.*?)<section end="?{part}"?\s*/>', other, re.S)
+            body += "\n" + (m.group(1) if m else "")
+        champion = game_champion(body)
+        if champion:  # 比賽類（新秀挑戰賽、名人賽）：冠軍隊 + 歷屆 MVP 頁面裡今年的 MVP
+            further = re.search(r"\{\{(?:Further|Main)\|([^|}]+)", body, re.I)
+            mvp = await event_mvp(session, further.group(1).strip(), year) if further else None
+            found.append((heading, champion, [(f"MVP：{mvp[0]}", mvp[1])] if mvp else []))
+            continue
+        label, people = contest_winner(body)
+        if people or label:
+            found.append((heading, label, people))
+    return [h for h, _ in events], found
+
+
+def section_text(text: str, heading: str) -> str:
+    """維基語法裡某個 == 小節 == 的內容；找不到就回傳空字串"""
+    m = re.search(rf"^(=+)\s*{re.escape(heading)}\s*\1\s*$(.*?)(?=^==[^=]|\Z)", text, re.M | re.S | re.I)
+    return m.group(2) if m else ""
+
+
+CELL_ATTR = re.compile(r"^([^|\[{]*=[^|\[{]*)\|(.*)$", re.S)  # 格子開頭的樣式，例如 bgcolor=#FEFF9F rowspan=3|
+
+
+def split_cell(cell: str) -> tuple[str, str]:
+    """表格格子 → (樣式, 純文字)；純文字去掉出賽次數 (2)、現役記號 ^"""
+    m = CELL_ATTR.match(cell.strip())
+    attrs, content = (m.group(1), m.group(2)) if m else ("", cell)
+    return attrs, " ".join(re.sub(r"\(\d+\)|\^", "", wiki_text(content)).split())
+
+
+def is_team(text: str) -> bool:
+    return text in team_by_fullname or any(text == t or text.endswith(" " + t) for t in team_terms)
+
+
+def team_zh(text: str) -> str:
+    return team_by_fullname.get(text, text) if text else ""
+
+
+def game_champion(body: str) -> str:
+    """比賽類項目：最後一場（冠軍戰）的勝隊；還沒打完回傳空字串"""
+    if (re.search(r"^=+\s*semifinal", body, re.I | re.M)
+            and not re.search(r"^=+\s*(?:championship|final)", body, re.I | re.M)):
+        return ""  # 只有準決賽、冠軍戰還沒排上去
+    boxes = re.findall(r"\{\{basketballbox(.*?)\n\}\}", body, re.S | re.I)
+    if boxes:
+        cells = dict(re.findall(r"\|\s*(team1|team2|score1|score2)\s*=([^|\n]*)", boxes[-1]))
+        games = [(cells.get("team1", ""), cells.get("score1", ""), cells.get("team2", ""), cells.get("score2", ""))]
+    else:  # 對戰表：| 日期 | 隊伍 | 分數 | 隊伍 | 分數
+        bracket = re.search(r"\{\{#invoke:RoundN(.*?)\n\}\}", body, re.S)
+        games = re.findall(r"^\|[^|\n]*\|\s*([^|\n]+?)\s*\|\s*([^|\n]*?)\s*\|\s*([^|\n]+?)\s*\|\s*([^|\n]*?)\s*$",
+                           bracket.group(1), re.M) if bracket else []
+    if not games:
+        return ""
+    team1, score1, team2, score2 = games[-1]
+    score1, score2 = re.sub(r"\D", "", score1), re.sub(r"\D", "", score2)
+    if not score1 or not score2 or score1 == score2:
+        return ""
+    return wiki_text(team1 if int(score1) > int(score2) else team2)
+
+
+def contest_winner(body: str) -> tuple[str, list[tuple[str, str]]]:
+    """個人或團隊賽：表格裡用「冠軍」底色標出來的那一組 → (隊名或空字串, [(人名, 球隊)])"""
+    legend = re.search(r"\{\{legend\|([^|}]+)\|[^}]*(?:champion|winner|winning)", body, re.I)
+    if not legend:
+        return bold_winner(body)
+    color = legend.group(1).strip().lower()
+    # 每一列從「|-」開始；底色可能標在「|- bgcolor=...」這行，也可能標在格子上
+    rows = [r.split("\n|}")[0] for r in re.split(r"\n(?=\|-)", body[legend.end():])]
+    start = next((i for i, r in enumerate(rows) if r.startswith("|-") and color in r.lower()), None)
+    if start is None:
+        return "", []
+    block = [rows[start]]
+    for r in rows[start + 1:]:  # 同一組跨好幾列（三人一隊），到下一個名次（! 開頭）為止
+        content = r.split("\n", 1)[1] if "\n" in r else ""
+        if not r.startswith("|-") or content.lstrip().startswith("!") or not content.strip():
+            break
+        block.append(r)
+    label, people, carry, carry_rows = "", [], "", 0
+    for row in block:
+        cells = []
+        for line in row.split("\n"):
+            if line.startswith("|") and not line.startswith(("|}", "|+")):
+                cells += line[1:].split("||")
+        person, team = "", None
+        for cell in cells:
+            attrs, text = split_cell(cell)
+            if not text:
+                continue
+            if text.startswith("Team ") and "[[" not in cell:
+                label = label or text
+            elif is_team(text):
+                if person and team is None:
+                    team = text
+                    span = re.search(r"rowspan\s*=\s*\"?(\d+)", attrs)
+                    carry, carry_rows = text, (int(span.group(1)) if span else 1)
+            elif "[[" in cell and not person:
+                person = text
+        if person:
+            if team is None and carry_rows > 0:  # 和上一位共用（rowspan）的球隊格
+                team = carry
+            people.append((person, team_zh(team or "")))
+        carry_rows -= 1
+    return label, people
+
+
+def bold_winner(body: str) -> tuple[str, list[tuple[str, str]]]:
+    """沒有底色說明的表格：冠軍的名字寫成粗體 '''[[名字]]'''，同一行後面的球隊連結是他的球隊"""
+    names = [n for n in dict.fromkeys(re.findall(r"'''\[\[([^\]]+)\]\]'''", body)) if not is_team(n)]
+    people = []
+    for n in names:
+        m = re.search(rf"'''\[\[{re.escape(n)}\]\]'''[^\n]*?\[\[([^\]]+)\]\]", body)
+        people.append((n, team_zh(m.group(1)) if m and is_team(m.group(1)) else ""))
+    label = ""
+    if names:  # 冠軍所在表格的標題（|+Team Cavs）就是隊名
+        caption = re.findall(r"^\|\+\s*(.+)$", body[:body.find(f"'''[[{names[0]}]]'''")], re.M)
+        if caption and wiki_text(caption[-1]).startswith("Team "):
+            label = wiki_text(caption[-1])
+    return label, people
+
+
+async def event_mvp(session: aiohttp.ClientSession, page: str, year: int) -> tuple[str, str] | None:
+    """歷屆 MVP 表格裡今年那一列 → (人名, 球隊)"""
+    text = await wiki_source(session, page)
+    sec = re.search(r"^(==+)\s*[^=\n]*(?:MVP|Most Valuable)[^=\n]*\1\s*$(.*?)(?=^==[^=]|\Z)", text, re.M | re.S | re.I)
+    if not sec:
+        return None
+    for row in re.split(r"\n\|-[^\n]*", sec.group(2)):
+        # 年份格：[[#2026|2026]]（已經換成 [[2026]]）或純文字「| 2026 ||」
+        m = re.search(rf"\[\[{year}\]\]|^\|[^\n|]*?(?<![\d/–]){year}\s*(?:\|\||$)", row, re.M)
+        if m:
+            cells = [t for _, t in map(split_cell, re.split(r"\|\||\n\|", row[m.end():])) if t]
+            if cells:
+                team = cells[1] if len(cells) > 1 and is_team(cells[1]) else ""
+                return cells[0], team_zh(team)
+    return None
 
 
 async def fetch_honors(session: aiohttp.ClientSession, season: int) -> list[tuple[str, str, str, str]]:
@@ -1636,6 +1805,59 @@ async def honor_updates(session: aiohttp.ClientSession, state: dict, initial: bo
     return [honor_message(season, *h) for h in new]
 
 
+def allstar_name(heading: str) -> str:
+    """Slam Dunk Contest → 灌籃大賽（Slam Dunk Contest）；沒在 ALLSTAR_ZH 的項目用翻譯（要先 prefetch）"""
+    name = next((n for p, n in ALLSTAR_ZH if re.search(p, heading, re.I)), None) or zh(heading)
+    return f"{name}（{heading}）" if name != heading else heading
+
+
+def allstar_message(year: int, heading: str, label: str, people: list) -> tuple[str, discord.Embed]:
+    who = [f"{p}（{t}）" if t else p for p, t in people]
+    if label:
+        lines = [f"🏆 **冠軍：{label}**"] + [f"• {w}" for w in who]
+    elif len(who) == 1:
+        lines = [f"🏆 **冠軍：{who[0]}**"]
+    else:
+        lines = ["🏆 **冠軍**"] + [f"• {w}" for w in who]
+    embed = discord.Embed(title=f"{year} 明星週｜{allstar_name(heading)}"[:256], description="\n".join(lines)[:4000],
+                          color=0xFFD700)
+    embed.set_footer(text="NBA 明星週")
+    embed.timestamp = datetime.now(timezone.utc)
+    return "⭐ **NBA 明星週**", embed
+
+
+def allstar_events_message(year: int, events: list[str], first: bool) -> tuple[str, discord.Embed]:
+    embed = discord.Embed(title=f"{year} 明星週{'項目公布' if first else '新增項目'}",
+                          description="\n".join(f"• {allstar_name(h)}" for h in events)[:4000], color=0xFFD700)
+    embed.set_footer(text="NBA 明星週")
+    embed.timestamp = datetime.now(timezone.utc)
+    return "⭐ **NBA 明星週**", embed
+
+
+async def allstar_updates(session: aiohttp.ClientSession, state: dict, initial: bool) -> list:
+    """明星週：NBA 公布當年的比賽項目時發一則項目清單（之後加的項目再補發），每項比完再發冠軍；
+    項目照當年的明星賽維基百科頁面，每年不同"""
+    now = datetime.now(ET)
+    if now.month not in ALLSTAR_MONTHS and not initial:
+        return []
+    if not initial and time.time() - state.get("allstar_checked", 0) < AWARD_CHECK_MINUTES * 60:
+        return []
+    events, results = await fetch_allstar(session, now.year)
+    announced = state.setdefault("allstar_events", [])
+    new_events = [h for h in events if f"{now.year}:{h}" not in announced]
+    first = not any(k.startswith(f"{now.year}:") for k in announced)
+    state["allstar_events"] = (announced + [f"{now.year}:{h}" for h in new_events])[-50:]
+    seen = set(state["allstar"])
+    new = [r for r in results if f"{now.year}:{r[0]}" not in seen]
+    state["allstar"] = (state["allstar"] + [f"{now.year}:{r[0]}" for r in new])[-50:]
+    state["allstar_checked"] = time.time()
+    if initial:
+        return []
+    await prefetch(session, [h for h in events if not any(re.search(p, h, re.I) for p, _ in ALLSTAR_ZH)])
+    messages = [allstar_events_message(now.year, new_events, first)] if new_events else []
+    return messages + [allstar_message(now.year, *r) for r in new]
+
+
 # ===== 選秀、樂透抽籤 =====
 def draft_year() -> int:
     """選秀在 6 月，8 月以後就看明年的選秀"""
@@ -1904,6 +2126,7 @@ async def collect_updates(session: aiohttp.ClientSession) -> tuple[list, dict]:
             ("shams", "Shams 新聞", shams_updates, []),
             ("awards", "獎項", award_updates, []),
             ("honors", "每週/每月獎項", honor_updates, []),
+            ("allstar", "明星週獎項", allstar_updates, []),
             ("draft", "選秀", draft_updates, {})):
         # 第一次抓到某個來源時只記錄現有資料，不發文，避免洗版
         initial = key not in state
