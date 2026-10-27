@@ -1,40 +1,5 @@
 {
   "games": {
-    "401909861": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909862": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909863": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909864": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909865": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909866": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909867": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
     "401909868": {
       "state": "post",
       "status": "STATUS_FINAL",
@@ -78,7 +43,27 @@
     "401909876": {
       "state": "in",
       "status": "STATUS_IN_PROGRESS",
-      "periods": 2
+      "periods": 3
+    },
+    "401909877": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909878": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909879": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909880": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     }
   },
   "days_done": [
