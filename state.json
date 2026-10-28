@@ -264,7 +264,7 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1793153731.5676463,
+  "awards_checked": 1793155830.5079083,
   "shams": [
     "50176173",
     "50239169",
@@ -283,7 +283,12 @@
     "year": 2027,
     "checked": 1793154328.535212
   },
-  "health": {},
+  "health": {
+    "每週/每月獎項": {
+      "since": 1793155830.706298,
+      "error": "ClientResponseError：503, message='Service Unavailable', url='https://en.wikipedia.org/w/api.php?action=parse&page=2026%E2%80%9327+NBA+season&format=json&formatversion=2&prop=sections'"
+    }
+  },
   "season": {
     "v": 3,
     "post_days": [],
