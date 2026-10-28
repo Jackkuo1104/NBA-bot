@@ -47,7 +47,7 @@
     },
     "401909877": {
       "state": "in",
-      "status": "STATUS_HALFTIME",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 2
     },
     "401909878": {
@@ -282,12 +282,7 @@
     "year": 2027,
     "checked": 1793146830.8428397
   },
-  "health": {
-    "比分": {
-      "since": 1793149243.0915856,
-      "error": "200, message='Attempt to decode JSON with unexpected mimetype: ', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261027'"
-    }
-  },
+  "health": {},
   "season": {
     "v": 3,
     "post_days": [],
