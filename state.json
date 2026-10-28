@@ -28,12 +28,12 @@
     "401909882": {
       "state": "in",
       "status": "STATUS_IN_PROGRESS",
-      "periods": 0
+      "periods": 1
     },
     "401909883": {
       "state": "in",
       "status": "STATUS_IN_PROGRESS",
-      "periods": 0
+      "periods": 1
     },
     "401909884": {
       "state": "in",
@@ -41,8 +41,8 @@
       "periods": 0
     },
     "401909885": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909886": {
@@ -290,7 +290,7 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1793229032.4591324,
+  "awards_checked": 1793231129.9788308,
   "shams": [
     "50176173",
     "50239169",
@@ -337,7 +337,7 @@
       "terms": [
         "球隊選項"
       ],
-      "t": 1793230827.035704
+      "t": 1793231129.4420805
     }
   },
   "allstar": [
