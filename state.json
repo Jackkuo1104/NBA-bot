@@ -302,24 +302,7 @@
     "year": 2027,
     "checked": 1793195995.8978775
   },
-  "health": {
-    "比分": {
-      "since": 1793199035.6152625,
-      "error": "ClientResponseError：403, message='Forbidden', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261028'"
-    },
-    "異動": {
-      "since": 1793199035.7175736,
-      "error": "ClientResponseError：403, message='Forbidden', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/transactions?limit=100'"
-    },
-    "新聞": {
-      "since": 1793199035.8221612,
-      "error": "ClientResponseError：403, message='Forbidden', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/news?limit=50'"
-    },
-    "Shams 新聞": {
-      "since": 1793199035.9251947,
-      "error": "ClientResponseError：403, message='Forbidden', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/news?limit=50'"
-    }
-  },
+  "health": {},
   "season": {
     "v": 3,
     "post_days": [],
