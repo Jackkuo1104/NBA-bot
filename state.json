@@ -297,17 +297,12 @@
   "honors": [
     "2027:players of the week:October 20–25"
   ],
-  "honors_checked": 1793198433.7429898,
+  "honors_checked": 1793200528.8843758,
   "draft": {
     "year": 2027,
     "checked": 1793199661.4736083
   },
-  "health": {
-    "比分": {
-      "since": 1793200231.8536284,
-      "error": "ContentTypeError：200, message='Attempt to decode JSON with unexpected mimetype: ', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261027'"
-    }
-  },
+  "health": {},
   "season": {
     "v": 3,
     "post_days": [],
