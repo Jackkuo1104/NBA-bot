@@ -23,7 +23,7 @@
     "401909881": {
       "state": "in",
       "status": "STATUS_IN_PROGRESS",
-      "periods": 0
+      "periods": 1
     },
     "401909882": {
       "state": "in",
@@ -310,12 +310,7 @@
     "year": 2027,
     "checked": 1793229926.745785
   },
-  "health": {
-    "比分": {
-      "since": 1793229926.6284804,
-      "error": "ContentTypeError：200, message='Attempt to decode JSON with unexpected mimetype: ', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261027'"
-    }
-  },
+  "health": {},
   "season": {
     "v": 3,
     "post_days": [],
@@ -342,7 +337,7 @@
       "terms": [
         "球隊選項"
       ],
-      "t": 1793230526.1416004
+      "t": 1793230827.035704
     }
   },
   "allstar": [
