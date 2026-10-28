@@ -282,12 +282,12 @@
   "honors_checked": 1793153732.106919,
   "draft": {
     "year": 2027,
-    "checked": 1793154328.535212
+    "checked": 1793158238.8267367
   },
   "health": {
     "每週/每月獎項": {
       "since": 1793155830.706298,
-      "error": "ClientResponseError：503, message='Service Unavailable', url='https://en.wikipedia.org/w/api.php?action=parse&page=2026%E2%80%9327+NBA+season&format=json&formatversion=2&prop=sections'"
+      "error": "ClientResponseError：503, message='Service Unavailable', url='https://en.wikipedia.org/w/api.php?action=parse&page=2026%E2%80%9327+NBA+season&format=json&formatversion=2&prop=wikitext&section=21'"
     }
   },
   "season": {
