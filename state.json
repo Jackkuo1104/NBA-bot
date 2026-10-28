@@ -17,8 +17,8 @@
     },
     "401909880": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 1
+      "status": "STATUS_HALFTIME",
+      "periods": 2
     },
     "401909881": {
       "state": "pre",
@@ -281,7 +281,7 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1793159726.9235876,
+  "awards_checked": 1793161838.5252416,
   "shams": [
     "50176173",
     "50239169",
@@ -300,7 +300,12 @@
     "year": 2027,
     "checked": 1793158238.8267367
   },
-  "health": {},
+  "health": {
+    "每週/每月獎項": {
+      "since": 1793161838.736983,
+      "error": "ClientResponseError：503, message='Service Unavailable', url='https://en.wikipedia.org/w/api.php?action=parse&page=2026%E2%80%9327+NBA+season&format=json&formatversion=2&prop=sections'"
+    }
+  },
   "season": {
     "v": 3,
     "post_days": [],
