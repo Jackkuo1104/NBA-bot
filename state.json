@@ -61,8 +61,8 @@
       "periods": 4
     },
     "401909880": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     }
   },
@@ -287,7 +287,7 @@
   "health": {
     "每週/每月獎項": {
       "since": 1793155830.706298,
-      "error": "ClientResponseError：503, message='Service Unavailable', url='https://en.wikipedia.org/w/api.php?action=parse&page=2026%E2%80%9327+NBA+season&format=json&formatversion=2&prop=sections'"
+      "error": "ClientResponseError：503, message='Service Unavailable', url='https://en.wikipedia.org/w/api.php?action=parse&page=2026%E2%80%9327+NBA+season&format=json&formatversion=2&prop=wikitext&section=21'"
     }
   },
   "season": {
