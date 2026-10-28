@@ -208,7 +208,8 @@
     "50297844",
     "50297902",
     "50301040",
-    "50302780"
+    "50302780",
+    "50303657"
   ],
   "awards": [
     "2026:33:4278073:25",
@@ -286,7 +287,7 @@
   "health": {
     "每週/每月獎項": {
       "since": 1793155830.706298,
-      "error": "ClientResponseError：503, message='Service Unavailable', url='https://en.wikipedia.org/w/api.php?action=parse&page=2026%E2%80%9327+NBA+season&format=json&formatversion=2&prop=sections'"
+      "error": "ClientResponseError：503, message='Service Unavailable', url='https://en.wikipedia.org/w/api.php?action=parse&page=2026%E2%80%9327+NBA+season&format=json&formatversion=2&prop=wikitext&section=21'"
     }
   },
   "season": {
