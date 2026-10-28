@@ -283,7 +283,7 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1793197228.4563754,
+  "awards_checked": 1793199036.9449735,
   "shams": [
     "50176173",
     "50239169",
@@ -302,7 +302,24 @@
     "year": 2027,
     "checked": 1793195995.8978775
   },
-  "health": {},
+  "health": {
+    "比分": {
+      "since": 1793199035.6152625,
+      "error": "ClientResponseError：403, message='Forbidden', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261028'"
+    },
+    "異動": {
+      "since": 1793199035.7175736,
+      "error": "ClientResponseError：403, message='Forbidden', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/transactions?limit=100'"
+    },
+    "新聞": {
+      "since": 1793199035.8221612,
+      "error": "ClientResponseError：403, message='Forbidden', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/news?limit=50'"
+    },
+    "Shams 新聞": {
+      "since": 1793199035.9251947,
+      "error": "ClientResponseError：403, message='Forbidden', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/news?limit=50'"
+    }
+  },
   "season": {
     "v": 3,
     "post_days": [],
