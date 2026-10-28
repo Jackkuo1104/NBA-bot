@@ -290,7 +290,7 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1793226932.1918292,
+  "awards_checked": 1793229032.4591324,
   "shams": [
     "50176173",
     "50239169",
@@ -310,12 +310,7 @@
     "year": 2027,
     "checked": 1793226323.844576
   },
-  "health": {
-    "比分": {
-      "since": 1793228726.6816623,
-      "error": "ContentTypeError：200, message='Attempt to decode JSON with unexpected mimetype: ', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261027'"
-    }
-  },
+  "health": {},
   "season": {
     "v": 3,
     "post_days": [],
@@ -342,7 +337,7 @@
       "terms": [
         "球隊選項"
       ],
-      "t": 1793228726.8332305
+      "t": 1793229032.0788937
     }
   },
   "allstar": [
