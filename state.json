@@ -21,23 +21,23 @@
       "periods": 4
     },
     "401909881": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909882": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909883": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909884": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909885": {
@@ -305,17 +305,12 @@
   "honors": [
     "2027:players of the week:October 20–25"
   ],
-  "honors_checked": 1793227826.249556,
+  "honors_checked": 1793229631.4372752,
   "draft": {
     "year": 2027,
     "checked": 1793226323.844576
   },
-  "health": {
-    "比分": {
-      "since": 1793229336.7244031,
-      "error": "ContentTypeError：200, message='Attempt to decode JSON with unexpected mimetype: ', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261027'"
-    }
-  },
+  "health": {},
   "season": {
     "v": 3,
     "post_days": [],
@@ -342,7 +337,7 @@
       "terms": [
         "球隊選項"
       ],
-      "t": 1793229336.7985692
+      "t": 1793229630.7190454
     }
   },
   "allstar": [
