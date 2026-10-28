@@ -1466,7 +1466,7 @@ def playoff_round(headline: str) -> tuple[str, int, str] | None:
 
 def series_caption(names: dict, wins: dict, need: int, final: bool) -> str:
     """{id: 中文隊名}, {id: 勝場} → 「勇士 晉級 4-1」「勇士 領先 2-1」「系列賽 1-1 平手」"""
-    (a, wa), (b, wb) = sorted(wins.items(), key=lambda x: -x[1])[:2]
+    (a, wa), (_, wb) = sorted(wins.items(), key=lambda x: -x[1])[:2]
     if wa >= need:
         return f"{names.get(a, '')} {'奪冠' if final else '晉級'} {wa}-{wb}"
     if wa == wb:
@@ -1516,7 +1516,7 @@ async def bracket_image(session: aiohttp.ClientSession, season: int, date: str) 
         return next((i for i, w in sr["wins"].items() if w >= need), None) if sr else None
 
     def box(sr: dict | None, feeders: list[str | None] | None = None, seeds: bool = False,
-            final: bool = False) -> "bracket.Box":
+            final: bool = False):
         if not sr:  # 還沒排出對戰：放已經晉級的球隊，其他待定
             return bracket.Box([bracket.Team(info[i]["abbr"], logos.get(i)) if i else bracket.Team()
                                 for i in (feeders or [None, None])])
@@ -1673,7 +1673,7 @@ async def season_updates(session: aiohttp.ClientSession, games: list[dict], stat
 async def game_updates(session: aiohttp.ClientSession, state: dict, initial: bool) -> list:
     games = await fetch_games(session)
     messages = day_done_updates(games, state, initial)
-    new_games = {}
+    new_games, live = {}, 0
     for game in games:
         status, name = game_status(game)
         prev = state["games"].get(game["id"])
@@ -1688,6 +1688,7 @@ async def game_updates(session: aiohttp.ClientSession, state: dict, initial: boo
         if not is_special(game) and not follows(  # 明星賽不受 FOLLOW_TEAMS 限制
                 team_abbr(side(game, "away")["team"]), team_abbr(side(game, "home")["team"])):
             continue
+        live += status == "in"
 
         # 這場比賽有變化（可能要發訊息）時，先翻譯訊息裡會用到的英文
         if (status, name, cur["periods"]) != (prev["state"], prev["status"], prev["periods"]):
@@ -1706,6 +1707,7 @@ async def game_updates(session: aiohttp.ClientSession, state: dict, initial: boo
         if cur["periods"] > prev["periods"]:  # 漏掉好幾節時只發最新一節
             messages.append(period_message(game))
     state["games"] = new_games
+    state["live_games"] = live  # 有即時比分的比賽正在進行：check_once 這次會每 30 秒再檢查
     before, after = await season_updates(session, games, state, initial)
     return before + messages + after
 
