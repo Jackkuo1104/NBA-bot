@@ -295,17 +295,12 @@
   "honors": [
     "2027:players of the week:October 20–25"
   ],
-  "honors_checked": 1793159727.338836,
+  "honors_checked": 1793163036.2761855,
   "draft": {
     "year": 2027,
     "checked": 1793162125.1044333
   },
-  "health": {
-    "每週/每月獎項": {
-      "since": 1793161838.736983,
-      "error": "ClientResponseError：503, message='Service Unavailable', url='https://en.wikipedia.org/w/api.php?action=parse&page=2026%E2%80%9327+NBA+season&format=json&formatversion=2&prop=sections'"
-    }
-  },
+  "health": {},
   "season": {
     "v": 3,
     "post_days": [],
