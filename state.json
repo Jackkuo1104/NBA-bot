@@ -62,8 +62,8 @@
     },
     "401909889": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 2
+      "status": "STATUS_END_PERIOD",
+      "periods": 3
     },
     "401909890": {
       "state": "in",
@@ -71,8 +71,8 @@
       "periods": 1
     },
     "401909891": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909892": {
@@ -236,7 +236,8 @@
     "50309485",
     "50311622",
     "50312370",
-    "50312726"
+    "50312726",
+    "50313096"
   ],
   "awards": [
     "2026:33:4278073:25",
@@ -339,7 +340,7 @@
       "terms": [
         "球隊選項"
       ],
-      "t": 1793238327.6653078
+      "t": 1793238630.3606522
     }
   },
   "allstar": [
