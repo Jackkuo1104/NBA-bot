@@ -41,13 +41,13 @@
       "periods": 4
     },
     "401909885": {
-      "state": "in",
-      "status": "STATUS_END_PERIOD",
+      "state": "post",
+      "status": "STATUS_FINAL",
       "periods": 4
     },
     "401909886": {
       "state": "in",
-      "status": "STATUS_END_PERIOD",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 3
     },
     "401909887": {
@@ -58,7 +58,7 @@
     "401909888": {
       "state": "in",
       "status": "STATUS_IN_PROGRESS",
-      "periods": 2
+      "periods": 3
     },
     "401909889": {
       "state": "in",
@@ -340,7 +340,7 @@
       "terms": [
         "球隊選項"
       ],
-      "t": 1793239242.5875883
+      "t": 1793239523.1437635
     }
   },
   "allstar": [
