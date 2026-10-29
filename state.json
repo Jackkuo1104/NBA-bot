@@ -21,9 +21,9 @@
       "periods": 4
     },
     "401909881": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401909882": {
       "state": "in",
@@ -52,7 +52,7 @@
     },
     "401909887": {
       "state": "in",
-      "status": "STATUS_HALFTIME",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 2
     },
     "401909888": {
@@ -62,7 +62,7 @@
     },
     "401909889": {
       "state": "in",
-      "status": "STATUS_HALFTIME",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 2
     },
     "401909890": {
@@ -292,7 +292,7 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1793235032.6305096,
+  "awards_checked": 1793237021.1955314,
   "shams": [
     "50176173",
     "50239169",
@@ -339,7 +339,7 @@
       "terms": [
         "球隊選項"
       ],
-      "t": 1793236827.3001084
+      "t": 1793237020.7015097
     }
   },
   "allstar": [
