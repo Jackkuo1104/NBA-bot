@@ -22,7 +22,7 @@
     },
     "401909881": {
       "state": "in",
-      "status": "STATUS_HALFTIME",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 2
     },
     "401909882": {
@@ -32,8 +32,8 @@
     },
     "401909883": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 1
+      "status": "STATUS_HALFTIME",
+      "periods": 2
     },
     "401909884": {
       "state": "in",
@@ -43,26 +43,26 @@
     "401909885": {
       "state": "in",
       "status": "STATUS_IN_PROGRESS",
-      "periods": 0
+      "periods": 1
     },
     "401909886": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909887": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909888": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909889": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909890": {
@@ -311,12 +311,7 @@
     "year": 2027,
     "checked": 1793229926.745785
   },
-  "health": {
-    "比分": {
-      "since": 1793232928.7919292,
-      "error": "ContentTypeError：200, message='Attempt to decode JSON with unexpected mimetype: ', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261027'"
-    }
-  },
+  "health": {},
   "season": {
     "v": 3,
     "post_days": [],
@@ -343,7 +338,7 @@
       "terms": [
         "球隊選項"
       ],
-      "t": 1793233230.3548505
+      "t": 1793233328.3767836
     }
   },
   "allstar": [
