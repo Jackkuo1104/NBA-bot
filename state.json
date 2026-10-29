@@ -1,25 +1,5 @@
 {
   "games": {
-    "401909877": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 5
-    },
-    "401909878": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909879": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909880": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
     "401909881": {
       "state": "post",
       "status": "STATUS_FINAL",
@@ -77,8 +57,23 @@
     },
     "401909892": {
       "state": "in",
-      "status": "STATUS_HALFTIME",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 2
+    },
+    "401909893": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909894": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909895": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     }
   },
   "days_done": [
@@ -343,7 +338,7 @@
       "terms": [
         "球隊選項"
       ],
-      "t": 1793246121.844025
+      "t": 1793246447.8259068
     }
   },
   "allstar": [
