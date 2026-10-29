@@ -32,8 +32,8 @@
     },
     "401909883": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "status": "STATUS_END_PERIOD",
+      "periods": 4
     },
     "401909884": {
       "state": "in",
@@ -42,7 +42,7 @@
     },
     "401909885": {
       "state": "in",
-      "status": "STATUS_END_PERIOD",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 3
     },
     "401909886": {
@@ -307,10 +307,10 @@
   "honors": [
     "2027:players of the week:October 20–25"
   ],
-  "honors_checked": 1793235645.6266856,
+  "honors_checked": 1793237725.9051683,
   "draft": {
     "year": 2027,
-    "checked": 1793233840.3699098
+    "checked": 1793237725.905188
   },
   "health": {},
   "season": {
@@ -339,7 +339,7 @@
       "terms": [
         "球隊選項"
       ],
-      "t": 1793237439.8150904
+      "t": 1793237725.1597276
     }
   },
   "allstar": [
