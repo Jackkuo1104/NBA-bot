@@ -27,8 +27,8 @@
     },
     "401909882": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 1
+      "status": "STATUS_HALFTIME",
+      "periods": 2
     },
     "401909883": {
       "state": "in",
@@ -337,7 +337,7 @@
       "terms": [
         "球隊選項"
       ],
-      "t": 1793232324.313728
+      "t": 1793232629.9222188
     }
   },
   "allstar": [
