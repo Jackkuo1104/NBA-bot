@@ -310,7 +310,12 @@
     "year": 2027,
     "checked": 1793229926.745785
   },
-  "health": {},
+  "health": {
+    "比分": {
+      "since": 1793232928.7919292,
+      "error": "ContentTypeError：200, message='Attempt to decode JSON with unexpected mimetype: ', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261027'"
+    }
+  },
   "season": {
     "v": 3,
     "post_days": [],
@@ -337,7 +342,7 @@
       "terms": [
         "球隊選項"
       ],
-      "t": 1793232629.9222188
+      "t": 1793232928.9804745
     }
   },
   "allstar": [
