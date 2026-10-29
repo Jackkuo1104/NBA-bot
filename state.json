@@ -67,8 +67,8 @@
     },
     "401909890": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "status": "STATUS_END_PERIOD",
+      "periods": 4
     },
     "401909891": {
       "state": "in",
@@ -342,7 +342,7 @@
       "terms": [
         "球隊選項"
       ],
-      "t": 1793244029.7122166
+      "t": 1793244328.8765976
     }
   },
   "allstar": [
