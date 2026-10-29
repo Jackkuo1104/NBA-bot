@@ -26,9 +26,9 @@
       "periods": 4
     },
     "401909882": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401909883": {
       "state": "in",
@@ -42,12 +42,12 @@
     },
     "401909885": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 2
+      "status": "STATUS_END_PERIOD",
+      "periods": 3
     },
     "401909886": {
       "state": "in",
-      "status": "STATUS_HALFTIME",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 2
     },
     "401909887": {
@@ -57,7 +57,7 @@
     },
     "401909888": {
       "state": "in",
-      "status": "STATUS_HALFTIME",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 2
     },
     "401909889": {
@@ -339,7 +339,7 @@
       "terms": [
         "球隊選項"
       ],
-      "t": 1793237124.7523882
+      "t": 1793237439.8150904
     }
   },
   "allstar": [
