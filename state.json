@@ -41,9 +41,9 @@
       "periods": 4
     },
     "401909285": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401909286": {
       "state": "post",
@@ -87,7 +87,6 @@
     }
   },
   "days_done": [
-    "2026-10-20",
     "2026-10-21",
     "2026-10-22",
     "2026-10-23",
@@ -96,7 +95,8 @@
     "2026-10-26",
     "2026-10-27",
     "2026-10-28",
-    "2026-10-29"
+    "2026-10-29",
+    "2026-10-30"
   ],
   "tx": [
     "2026-10-16|2|Re-signed G Payton Pritchard to a veteran extension.",
