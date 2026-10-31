@@ -1,20 +1,5 @@
 {
   "games": {
-    "401909893": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909894": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909895": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
     "401909277": {
       "state": "post",
       "status": "STATUS_FINAL",
@@ -62,8 +47,43 @@
     },
     "401909286": {
       "state": "in",
-      "status": "STATUS_END_PERIOD",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 3
+    },
+    "401909896": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909897": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909898": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909899": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909900": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909901": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909902": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     }
   },
   "days_done": [
@@ -292,7 +312,7 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1793417126.2213936,
+  "awards_checked": 1793419244.5555036,
   "shams": [
     "50176173",
     "50239169",
@@ -308,7 +328,7 @@
   "honors": [
     "2027:players of the week:October 20–25"
   ],
-  "honors_checked": 1793417126.6404161,
+  "honors_checked": 1793419245.0629184,
   "draft": {
     "year": 2027,
     "checked": 1793418029.8333948
