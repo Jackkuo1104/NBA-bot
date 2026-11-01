@@ -62,22 +62,22 @@
     },
     "401909898": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 1
+      "status": "STATUS_HALFTIME",
+      "periods": 2
     },
     "401909899": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909900": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909901": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909902": {
