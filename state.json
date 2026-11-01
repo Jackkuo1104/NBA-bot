@@ -72,7 +72,7 @@
     },
     "401909900": {
       "state": "in",
-      "status": "STATUS_END_PERIOD",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 3
     },
     "401909901": {
@@ -82,7 +82,7 @@
     },
     "401909902": {
       "state": "in",
-      "status": "STATUS_HALFTIME",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 2
     }
   },
@@ -318,7 +318,7 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1793496032.489048,
+  "awards_checked": 1793498124.067402,
   "shams": [
     "50176173",
     "50239169",
@@ -335,7 +335,7 @@
   "honors": [
     "2027:players of the week:October 20–25"
   ],
-  "honors_checked": 1793496033.0398407,
+  "honors_checked": 1793498124.5728326,
   "draft": {
     "year": 2027,
     "checked": 1793496927.7519495
