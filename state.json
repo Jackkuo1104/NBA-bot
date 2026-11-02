@@ -1,40 +1,5 @@
 {
   "games": {
-    "401909896": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909897": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909898": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909899": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909900": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909901": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909902": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
     "401909903": {
       "state": "post",
       "status": "STATUS_FINAL",
@@ -54,6 +19,81 @@
       "state": "post",
       "status": "STATUS_FINAL",
       "periods": 4
+    },
+    "401909907": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909908": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909909": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909910": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909911": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909912": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909913": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909914": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909915": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909916": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909917": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909918": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909919": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909920": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909921": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     }
   },
   "days_done": [
