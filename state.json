@@ -1,79 +1,74 @@
 {
   "games": {
-    "401909907": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909922": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909908": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909923": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909909": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909924": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909910": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909925": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909911": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909926": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909912": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909927": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909913": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909928": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909914": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 5
+    "401909929": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909915": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909930": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909916": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909931": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909917": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909932": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909918": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909933": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909919": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909934": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909920": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909921": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909935": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     }
   },
   "days_done": [
@@ -347,7 +342,7 @@
   "honors_checked": 1793767529.669459,
   "draft": {
     "year": 2027,
-    "checked": 1793764528.168782
+    "checked": 1793768448.9566004
   },
   "health": {},
   "season": {
