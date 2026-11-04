@@ -1286,6 +1286,19 @@ def news_label(article: dict) -> str:
     return "🚨 **NBA 重大消息**" if is_big(article) else "📰 **NBA 新聞**"
 
 
+def article_image(article: dict) -> str | None:
+    """新聞的圖片：ESPN 有時第一張放多年前的無關資料照（例如 2015 年的棒球），
+    有近期的圖就跳過這種舊照（網址裡有拍攝年份：/photo/2015/0802/）"""
+    images = [i["url"] for i in article.get("images") or [] if i.get("url")]
+    year = parse_time(article.get("published")).year
+
+    def recent(url: str) -> bool:
+        m = re.search(r"/photo/(\d{4})/", url)
+        return not m or year <= 1 or year - int(m.group(1)) <= 1
+
+    return next((u for u in images if recent(u)), images[0] if images else None)
+
+
 def news_embed(article: dict) -> discord.Embed:
     embed = discord.Embed(
         title=(article.get("headline") or "（無標題）")[:256],
@@ -1295,9 +1308,9 @@ def news_embed(article: dict) -> discord.Embed:
     )
     if article.get("byline"):
         embed.set_author(name=article["byline"][:256])
-    images = article.get("images") or []
-    if images and images[0].get("url"):
-        embed.set_image(url=images[0]["url"])
+    image = article_image(article)
+    if image:
+        embed.set_image(url=image)
     if article.get("published"):
         published = parse_time(article["published"])
         if published.year > 1:
