@@ -939,7 +939,23 @@ def group_trades(txs: list[dict]) -> list[list[dict]]:
     return groups
 
 
-def tx_message(group: list[dict], contracts: dict | None = None) -> tuple[str, discord.Embed]:
+async def tx_headshot(session: aiohttp.ClientSession, group: list[dict]) -> str | None:
+    """只有一位球員的異動：從球隊名單找他的大頭照（官方異動沒有球員 ID）；找不到就不放"""
+    names = tx_players(group[0].get("description", "")) if len(group) == 1 else []
+    team_id = (group[0].get("team") or {}).get("id")
+    if len(names) != 1 or not team_id:
+        return None
+    try:
+        data = await get_json(session, f"{ESPN_API}/teams/{team_id}/roster")
+    except Exception as e:
+        print(f"⚠️ 抓取球隊名單失敗：{error_text(e)}")
+        return None
+    return next(((a.get("headshot") or {}).get("href") for a in data.get("athletes") or []
+                 if norm_name(a.get("fullName") or "") == norm_name(names[0])), None)
+
+
+def tx_message(group: list[dict], contracts: dict | None = None,
+               headshot: str | None = None) -> tuple[str, discord.Embed]:
     label, color, _ = TX_KINDS.get(tx_kind(group[0]), ("📰 異動", 0x757575, ()))
     if len(group) == 1:
         description = zh(group[0].get("description", ""))
@@ -953,6 +969,8 @@ def tx_message(group: list[dict], contracts: dict | None = None) -> tuple[str, d
     team = group[0].get("team") or {}
     if len(group) == 1 and team.get("id"):
         embed.set_author(name=team_name(team["id"]) or team.get("displayName", ""), icon_url=team_logo(team))
+    if headshot:
+        embed.set_thumbnail(url=headshot)
     embed.set_footer(text=f"NBA 異動｜{(group[0].get('date') or '')[:10]}")
     return "📰 **NBA 球員異動**", embed
 
@@ -972,6 +990,7 @@ CONTRACT_MONEY = re.compile(
     r"\$(?P<amount>\d+(?:\.\d+)?)\s*(?P<unit>million|billion|M|B)\b", re.I)
 CONTRACT_YEARS = re.compile(r"\b(?P<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)[- ]year\b", re.I)
 CONTRACT_WORDS = re.compile(r"\b(agree|agrees|agreed|sign|signs|signed|re-sign|extension|deal|contract|max)\b", re.I)
+NUM = r"(?P<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)"  # 年數可能寫數字或英文（2-year、two-year）
 CONTRACT_TYPES = [  # 異動敘述裡的合約種類 → 中文（由上往下找第一個符合的）
     (r"two-way", "雙向合約"), (r"exhibit[- ]10", "Exhibit 10 合約（訓練營合約）"),
     (r"10-day", "10 天短約"), (r"rest[- ]of[- ]season", "本季剩餘合約"),
@@ -979,9 +998,9 @@ CONTRACT_TYPES = [  # 異動敘述裡的合約種類 → 中文（由上往下�
     (r"veteran(?:'s)? minimum", "老將底薪合約"), (r"\bminimum\b", "底薪合約"),
     (r"veteran extension", "老將延長合約"), (r"\bmax(?:imum)? (?:contract|extension)", "頂薪合約"),
     (r"multiyear (?:contract )?extension", "多年延長合約"),
-    (r"\b(?P<n>\d+)-year (?:contract )?extension", "{n} 年延長合約"), (r"\bextension\b", "延長合約"),
+    (rf"\b{NUM}-year (?:contract )?extension", "{n} 年延長合約"), (r"\bextension\b", "延長合約"),
     (r"minor league contract", "小聯盟合約"), (r"major league contract", "大聯盟合約"),
-    (r"\b(?P<n>\d+)-year", "{n} 年合約"), (r"\bone-year", "1 年合約"), (r"multiyear", "多年合約"),
+    (rf"\b{NUM}-year", "{n} 年合約"), (r"multiyear", "多年合約"),
     (r"standard contract", "標準合約"),
 ]
 CONTRACT_TYPES = [(re.compile(p, re.I), t) for p, t in CONTRACT_TYPES]
@@ -1100,7 +1119,7 @@ def contract_type(sentence: str, default: str) -> str:
     for pattern, zh_type in CONTRACT_TYPES:
         m = pattern.search(sentence)
         if m:
-            return zh_type.format(**m.groupdict())
+            return zh_type.format(**{k: NUM_WORDS.get((v or "").lower(), v) for k, v in m.groupdict().items()})
     return default
 
 
@@ -1826,7 +1845,8 @@ async def tx_updates(session: aiohttp.ClientSession, state: dict, initial: bool)
     groups = [g for g in group_trades(new_txs)
               if not all(reported_by_shams(t, state.get("shams_tx", {})) for t in g)]
     await asyncio.gather(*(translate_tx(session, t) for g in groups for t in g))
-    return [tx_message(group, state.get("contracts")) for group in groups]
+    headshots = await asyncio.gather(*(tx_headshot(session, g) for g in groups))
+    return [tx_message(group, state.get("contracts"), shot) for group, shot in zip(groups, headshots)]
 
 
 async def news_updates(session: aiohttp.ClientSession, state: dict, initial: bool) -> list:
