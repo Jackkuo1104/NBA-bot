@@ -51,6 +51,21 @@ TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"  # Google 
 WIKI_API = "https://en.wikipedia.org/w/api.php"
 WIKI_HEADERS = {"User-Agent": "NBA-Discord-bot/1.0 (https://github.com/Jackkuo1104/NBA-bot)"}
 SHAMS_KEYWORD = "charania"  # 作者、標題或摘要含這個字的新聞當作 Shams 的消息
+# Shams 的消息最快：標題是球員異動的，改成「NBA 球員異動」的格式（隊徽、球員大頭照、合約）發送，
+# 之後 ESPN 正式公布同一筆異動時就不再重發
+SHAMS_TX = [  # (異動類型, 標題關鍵字)；由上往下找第一個符合的
+    ("trade", r"\btrad(?:e|es|ed|ing)\b|\bacquir"),
+    ("claim", r"\bclaim"),  # 要在 waive 前面：claimed off waivers 也含有 waive
+    ("waive", r"\bwaive|\breleas|\bbuyout"),
+    ("sign", r"\bagree[sd]?\b|\bsign(?:s|ed|ing)?\b|\bre-sign|\bextensions?\b|\bdeal\b"),
+    ("option", r"\boption\b"),
+    ("coach", r"\bhir(?:e|es|ed|ing)\b|\bfir(?:e|es|ed|ing)\b|\bpart(?:s|ing)? ways\b|\bdismiss"),
+]
+SHAMS_TX = [(kind, re.compile(p, re.I)) for kind, p in SHAMS_TX]
+# 還沒成交的（要求交易、洽談、有興趣…）照一般新聞發
+NOT_TX = re.compile(r"\brequest|\bexplor|\binterest(?:ed)?\b|\bdiscuss|\btalks\b|\bpursu|\bmeet(?:s|ing)?\b|"
+                    r"\bseek|\bconsider|\bweigh", re.I)
+SHAMS_TX_KEEP_DAYS = 30  # Shams 報過的異動記幾天（期間內 ESPN 正式公布的同一筆異動不再重發）
 # 標題或摘要符合這些字的新聞當作「紀錄」消息發送（不限 NEWS_TYPES）
 # 只認「破／追平紀錄」這類說法；record 當動詞（record his first bucket）或戰績（road record）不算
 RECORD_NEWS = re.compile(r"\b(?:set|sets|setting|break|breaks|breaking|broke|tie|ties|tying|tied|extend|extends|"
@@ -1291,6 +1306,72 @@ def news_embed(article: dict) -> discord.Embed:
     return embed
 
 
+def shams_tx_report(article: dict) -> tuple[str, list[str], list[dict]] | None:
+    """Shams 的異動消息：標題寫到異動、提到 NBA 球隊（人事異動以外還要有球員）才算；
+    回傳 (異動類型, 球隊 ID, 球員)"""
+    headline = article.get("headline") or ""
+    kind = next((k for k, pattern in SHAMS_TX if pattern.search(headline)), None)
+    if not kind or NOT_TX.search(headline):
+        return None
+    cats = article.get("categories") or []
+    teams = list(dict.fromkeys(str(c.get("teamId")) for c in cats
+                               if c.get("type") == "team" and str(c.get("teamId")) in nba_teams))
+    players = [c for c in cats if c.get("type") == "athlete" and c.get("athleteId") and c.get("description")]
+    named = [p for p in players
+             if re.sub(r"\s+(Jr\.?|Sr\.?|II|III|IV)$", "", p["description"]).split()[-1] in headline]
+    named = named or (players if len(players) == 1 else [])
+    if not teams or (not named and kind != "coach"):
+        return None
+    return kind, teams, named
+
+
+async def shams_tx_message(session: aiohttp.ClientSession, article: dict, kind: str, teams: list[str],
+                           players: list[dict], book: dict) -> tuple[str, discord.Embed]:
+    """和球員異動一樣的格式：隊名+隊徽、中文敘述、簽約附合約（新聞有寫金額就附上）、球員大頭照"""
+    names = [p["description"] for p in players]
+    headline, desc = article.get("headline") or "", article.get("description") or ""
+    description = await translate(session, desc or headline, person_terms(*names))
+    if kind == "sign":
+        contract = contract_type(f"{headline} {desc}", "合約")
+        lines = []
+        for name in names:
+            entry = book.get(norm_name(name)) or {}
+            money = entry.get("text")
+            lines.append(f"💰 {name}：{contract}｜{money}（依 ESPN 報導）" if money
+                         else f"📄 {name}：{contract}（金額未公開）")
+            lines += contract_extra(entry)
+        description += "\n\n" + "\n".join(lines)
+    label, color, _ = TX_KINDS[kind]
+    embed = discord.Embed(title=label, url=article.get("links", {}).get("web", {}).get("href"),
+                          description=description[:4000], color=color)
+    if len(teams) == 1:
+        embed.set_author(name=team_name(teams[0]),
+                         icon_url=f"https://a.espncdn.com/i/teamlogos/nba/500/{nba_teams[teams[0]][0].lower()}.png")
+    else:  # 交易牽涉好幾隊：列出所有球隊
+        embed.set_author(name=" ↔ ".join(team_name(t) for t in teams)[:256])
+    if len(players) == 1:
+        embed.set_thumbnail(url=f"https://a.espncdn.com/i/headshots/nba/players/full/{players[0]['athleteId']}.png")
+    published = parse_time(article.get("published"))
+    day = published.astimezone(TW).strftime("%Y-%m-%d") if published.year > 1 else ""
+    embed.set_footer(text=f"NBA 異動｜Shams 爆料｜{day}" if day else "NBA 異動｜Shams 爆料")
+    return "📰 **NBA 球員異動**", embed
+
+
+def tx_players(description: str) -> list[str]:
+    """異動敘述裡的球員名字"""
+    names = []
+    for sentence in SENTENCE_SPLIT.split(description):
+        for name in TX_NAME.findall(sentence) or SIGNED_NAME.findall(sentence):
+            names.append(re.sub(r"(?<!Jr)(?<!Sr)\.$", "", re.sub(r"['’]s$", "", name.strip())))
+    return names
+
+
+def reported_by_shams(tx: dict, reported: dict) -> bool:
+    """這筆正式異動的球員都已經由 Shams 報過同一類異動"""
+    names = tx_players(tx.get("description", ""))
+    return bool(names) and all(f"{tx_kind(tx)}|{norm_name(n)}" in reported for n in names)
+
+
 def article_id(article: dict) -> str:
     return str(article.get("id") or article.get("links", {}).get("web", {}).get("href", ""))
 
@@ -1728,8 +1809,11 @@ async def tx_updates(session: aiohttp.ClientSession, state: dict, initial: bool)
         print(f"⚠️ 從新聞找合約金額失敗：{error_text(e)}")
     if initial:
         return []
-    await asyncio.gather(*(translate_tx(session, t) for t in new_txs))
-    return [tx_message(group, state.get("contracts")) for group in group_trades(new_txs)]
+    # Shams 已經報過的異動不再重發
+    groups = [g for g in group_trades(new_txs)
+              if not all(reported_by_shams(t, state.get("shams_tx", {})) for t in g)]
+    await asyncio.gather(*(translate_tx(session, t) for g in groups for t in g))
+    return [tx_message(group, state.get("contracts")) for group in groups]
 
 
 async def news_updates(session: aiohttp.ClientSession, state: dict, initial: bool) -> list:
@@ -1752,7 +1836,21 @@ async def shams_updates(session: aiohttp.ClientSession, state: dict, initial: bo
     state["shams"] += [article_id(a) for a in new_articles]
     if initial:
         return []
-    return [("🚨 **Shams 最新消息**", news_embed(a)) for a in new_articles]
+    remember_contracts(state, new_articles)  # 這則新聞自己寫的金額、條款
+    reported = state.setdefault("shams_tx", {})
+    now = time.time()
+    for k in [k for k, t in reported.items() if now - t > SHAMS_TX_KEEP_DAYS * 86400]:
+        del reported[k]
+    messages = []
+    for a in new_articles:
+        report = shams_tx_report(a)
+        if report:  # 異動消息用球員異動的格式，其他的照原本的新聞格式
+            kind, teams, players = report
+            messages.append(await shams_tx_message(session, a, kind, teams, players, state.get("contracts", {})))
+            reported.update({f"{kind}|{norm_name(p['description'])}": now for p in players})
+        else:
+            messages.append(("🚨 **Shams 最新消息**", news_embed(a)))
+    return messages
 
 
 async def award_updates(session: aiohttp.ClientSession, state: dict, initial: bool) -> list:
