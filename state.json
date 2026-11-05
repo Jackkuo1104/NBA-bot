@@ -2,8 +2,8 @@
   "games": {
     "401909922": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 1
+      "status": "STATUS_HALFTIME",
+      "periods": 2
     },
     "401909923": {
       "state": "in",
