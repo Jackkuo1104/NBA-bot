@@ -22,22 +22,22 @@
     },
     "401909926": {
       "state": "in",
-      "status": "STATUS_END_PERIOD",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 1
     },
     "401909927": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909928": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909929": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909930": {
