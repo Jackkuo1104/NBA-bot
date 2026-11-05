@@ -32,8 +32,8 @@
     },
     "401909928": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "status": "STATUS_END_PERIOD",
+      "periods": 4
     },
     "401909929": {
       "state": "post",
@@ -66,8 +66,8 @@
       "periods": 1
     },
     "401909935": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     }
   },
@@ -324,7 +324,7 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1793848528.2589593,
+  "awards_checked": 1793850328.56761,
   "shams": [
     "50176173",
     "50239169",
