@@ -32,7 +32,7 @@
     },
     "401909928": {
       "state": "in",
-      "status": "STATUS_END_PERIOD",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 3
     },
     "401909929": {
@@ -347,7 +347,7 @@
   "honors_checked": 1793846729.5460558,
   "draft": {
     "year": 2027,
-    "checked": 1793844328.308992
+    "checked": 1793848226.2027967
   },
   "health": {},
   "season": {
