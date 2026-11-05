@@ -57,18 +57,28 @@
     },
     "401909933": {
       "state": "in",
-      "status": "STATUS_END_PERIOD",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 3
     },
     "401909934": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 2
+      "status": "STATUS_END_PERIOD",
+      "periods": 3
     },
     "401909935": {
       "state": "in",
       "status": "STATUS_IN_PROGRESS",
       "periods": 2
+    },
+    "401909936": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909937": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     }
   },
   "days_done": [
@@ -344,7 +354,7 @@
     "2027:players of the week:October 20–25",
     "2027:players of the week:October 26 – November 1"
   ],
-  "honors_checked": 1793852726.1546226,
+  "honors_checked": 1793854845.8504207,
   "draft": {
     "year": 2027,
     "checked": 1793851832.2598937
