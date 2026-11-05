@@ -21,9 +21,9 @@
       "periods": 3
     },
     "401909926": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401909927": {
       "state": "in",
@@ -32,8 +32,8 @@
     },
     "401909928": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 2
+      "status": "STATUS_END_PERIOD",
+      "periods": 3
     },
     "401909929": {
       "state": "in",
@@ -47,8 +47,8 @@
     },
     "401909931": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 1
+      "status": "STATUS_HALFTIME",
+      "periods": 2
     },
     "401909932": {
       "state": "in",
