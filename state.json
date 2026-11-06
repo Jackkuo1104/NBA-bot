@@ -73,7 +73,7 @@
     "401909936": {
       "state": "in",
       "status": "STATUS_IN_PROGRESS",
-      "periods": 2
+      "periods": 3
     },
     "401909937": {
       "state": "in",
@@ -342,7 +342,7 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1793935230.2999349,
+  "awards_checked": 1793937323.42659,
   "shams": [
     "50176173",
     "50239169",
@@ -362,7 +362,7 @@
     "2027:players of the week:October 20–25",
     "2027:players of the week:October 26 – November 1"
   ],
-  "honors_checked": 1793935230.6106958,
+  "honors_checked": 1793937323.762966,
   "draft": {
     "year": 2027,
     "checked": 1793934051.4037182
