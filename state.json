@@ -358,7 +358,8 @@
     "50329298",
     "50336717",
     "50368707",
-    "50381574"
+    "50381574",
+    "50422647"
   ],
   "honors": [
     "2027:players of the week:October 20–25",
@@ -415,5 +416,7 @@
   ],
   "allstar_checked": 1793093097.1917815,
   "live_games": 0,
-  "shams_tx": {}
+  "shams_tx": {
+    "trade|nique clifford": 1794163829.5039964
+  }
 }
