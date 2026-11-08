@@ -46,9 +46,9 @@
       "periods": 4
     },
     "401909938": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401909939": {
       "state": "pre",
@@ -351,7 +351,7 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1794096047.7619872,
+  "awards_checked": 1794098122.6014664,
   "shams": [
     "50176173",
     "50239169",
