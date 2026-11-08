@@ -77,7 +77,7 @@
     },
     "401909944": {
       "state": "in",
-      "status": "STATUS_HALFTIME",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 2
     }
   },
@@ -372,7 +372,7 @@
     "2027:players of the week:October 20–25",
     "2027:players of the week:October 26 – November 1"
   ],
-  "honors_checked": 1794110442.7972262,
+  "honors_checked": 1794112522.4836767,
   "draft": {
     "year": 2027,
     "checked": 1794110730.2566211
