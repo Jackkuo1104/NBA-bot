@@ -62,12 +62,12 @@
     },
     "401909950": {
       "state": "in",
-      "status": "STATUS_END_PERIOD",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 1
     },
     "401909951": {
       "state": "in",
-      "status": "STATUS_END_PERIOD",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 1
     }
   },
@@ -372,7 +372,7 @@
     "2027:players of the week:October 20–25",
     "2027:players of the week:October 26 – November 1"
   ],
-  "honors_checked": 1794190234.9531672,
+  "honors_checked": 1794192329.006934,
   "draft": {
     "year": 2027,
     "checked": 1794189644.8386164
