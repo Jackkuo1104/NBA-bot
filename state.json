@@ -22,8 +22,8 @@
     },
     "401909964": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "status": "STATUS_END_PERIOD",
+      "periods": 4
     },
     "401909965": {
       "state": "in",
