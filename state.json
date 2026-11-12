@@ -53,12 +53,12 @@
     "401909970": {
       "state": "in",
       "status": "STATUS_IN_PROGRESS",
-      "periods": 0
+      "periods": 1
     },
     "401909971": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 0
+      "status": "STATUS_END_PERIOD",
+      "periods": 1
     },
     "401909972": {
       "state": "in",
@@ -395,7 +395,8 @@
     "50381574",
     "50422647",
     "50434463",
-    "50454130"
+    "50454130",
+    "50457114"
   ],
   "honors": [
     "2027:players of the week:October 20–25",
@@ -407,7 +408,12 @@
     "year": 2027,
     "checked": 1794444328.1536498
   },
-  "health": {},
+  "health": {
+    "中文翻譯": {
+      "since": 1794447328.171869,
+      "error": "Google 翻譯的請求全部失敗，訊息會先顯示英文"
+    }
+  },
   "season": {
     "v": 3,
     "post_days": [],
@@ -454,6 +460,7 @@
   "allstar_checked": 1793093097.1917815,
   "live_games": 0,
   "shams_tx": {
-    "trade|nique clifford": 1794163829.5039964
+    "trade|nique clifford": 1794163829.5039964,
+    "sign|mason plumlee": 1794447327.0490806
   }
 }
