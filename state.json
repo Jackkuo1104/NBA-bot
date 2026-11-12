@@ -72,8 +72,8 @@
     },
     "401909974": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 1
+      "status": "STATUS_HALFTIME",
+      "periods": 2
     },
     "401909975": {
       "state": "in",
@@ -110,7 +110,8 @@
     "2026-11-05|5|Signed F Norchad Omier to a two-way contract. Waived F Riley Minix.",
     "2026-11-07|29|Signed G Richie Saunders to two-way contract.",
     "2026-11-08|23|Traded (G) Nique Clifford to the Oklahoma City Thunder.",
-    "2026-11-08|23|Traded G Nique Clifford to the Oklahoma City Thunder."
+    "2026-11-08|23|Traded G Nique Clifford to the Oklahoma City Thunder.",
+    "2026-11-11|13|Signed F Carson Cooper to a two-way contract. Waived C Lawson Lovering."
   ],
   "news": [
     "50151066",
