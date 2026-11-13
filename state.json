@@ -411,10 +411,6 @@
     "中文翻譯": {
       "since": 1794447328.171869,
       "error": "Google 翻譯的請求全部失敗，訊息會先顯示英文"
-    },
-    "異動": {
-      "since": 1794549924.214566,
-      "error": "ClientResponseError：400, message='Bad Request', url='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/transactions?limit=100'"
     }
   },
   "season": {
