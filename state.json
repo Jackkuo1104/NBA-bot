@@ -397,7 +397,8 @@
     "50434463",
     "50454130",
     "50457114",
-    "50464091"
+    "50464091",
+    "50473732"
   ],
   "honors": [
     "2027:players of the week:October 20–25",
@@ -409,12 +410,7 @@
     "year": 2027,
     "checked": 1794598833.301566
   },
-  "health": {
-    "中文翻譯": {
-      "since": 1794447328.171869,
-      "error": "Google 翻譯的請求全部失敗，訊息會先顯示英文"
-    }
-  },
+  "health": {},
   "season": {
     "v": 3,
     "post_days": [],
@@ -462,6 +458,7 @@
   "live_games": 0,
   "shams_tx": {
     "trade|nique clifford": 1794163829.5039964,
-    "sign|mason plumlee": 1794447327.0490806
+    "sign|mason plumlee": 1794447327.0490806,
+    "trade|dejounte murray": 1794599726.4038653
   }
 }
