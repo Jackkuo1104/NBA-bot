@@ -57,8 +57,8 @@
     },
     "401909977": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 4
+      "status": "STATUS_END_PERIOD",
+      "periods": 5
     },
     "401909978": {
       "state": "in",
@@ -409,7 +409,7 @@
   "honors_checked": 1794537076.4587202,
   "draft": {
     "year": 2027,
-    "checked": 1794534927.6946754
+    "checked": 1794538529.1297889
   },
   "health": {
     "中文翻譯": {
