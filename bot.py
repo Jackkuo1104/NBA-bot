@@ -277,11 +277,19 @@ def award_seasons() -> list[int]:
     return [season - 1, season]
 
 
+NEWS_CACHE_SECONDS = 30  # 同一次檢查裡（合約金額、新聞、Shams）共用同一批新聞，不重複抓
+_news_cache: dict[int, tuple[float, list[dict]]] = {}
+
+
 async def fetch_news(session: aiohttp.ClientSession, limit: int = 50) -> list[dict]:
+    cached = _news_cache.get(limit)
+    if cached and time.monotonic() - cached[0] < NEWS_CACHE_SECONDS:
+        return cached[1]
     data = await get_json(session, f"{ESPN_API}/news", {"limit": str(limit)})
     articles = data.get("articles") or []
     if not articles:  # ESPN 一定有新聞；抓到空的代表格式改了，讓健康檢查知道
         raise RuntimeError("ESPN 新聞回傳是空的")
+    _news_cache[limit] = (time.monotonic(), articles)
     return articles  # 新到舊
 
 
@@ -1346,8 +1354,11 @@ def shams_tx_report(article: dict) -> tuple[str, list[str], list[dict]] | None:
     if not kind or NOT_TX.search(headline):
         return None
     cats = article.get("categories") or []
-    teams = list(dict.fromkeys(str(c.get("teamId")) for c in cats
-                               if c.get("type") == "team" and str(c.get("teamId")) in nba_teams))
+    team_cats = {str(c.get("teamId")): c.get("description") or "" for c in cats
+                 if c.get("type") == "team" and str(c.get("teamId")) in nba_teams}
+    teams = list(team_cats)
+    if kind != "trade" and len(teams) > 1:  # 簽約等異動的新聞也會標原球隊：只取標題提到的那隊
+        teams = [t for t in teams if team_cats[t] and team_cats[t].split()[-1] in headline] or teams
     players = [c for c in cats if c.get("type") == "athlete" and c.get("athleteId") and c.get("description")]
     named = [p for p in players
              if re.sub(r"\s+(Jr\.?|Sr\.?|II|III|IV)$", "", p["description"]).split()[-1] in headline]
