@@ -61,9 +61,9 @@
       "periods": 3
     },
     "401910014": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401910016": {
       "state": "in",
@@ -73,7 +73,7 @@
     "401910015": {
       "state": "in",
       "status": "STATUS_IN_PROGRESS",
-      "periods": 0
+      "periods": 1
     },
     "401910017": {
       "state": "in",
