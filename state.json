@@ -37,8 +37,8 @@
     },
     "401910009": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 2
+      "status": "STATUS_END_PERIOD",
+      "periods": 3
     },
     "401910010": {
       "state": "in",
@@ -47,8 +47,8 @@
     },
     "401910011": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 2
+      "status": "STATUS_END_PERIOD",
+      "periods": 3
     },
     "401910012": {
       "state": "in",
@@ -62,7 +62,7 @@
     },
     "401910014": {
       "state": "in",
-      "status": "STATUS_HALFTIME",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 2
     },
     "401910016": {
@@ -472,7 +472,7 @@
   "honors_checked": 1795054232.7402222,
   "draft": {
     "year": 2027,
-    "checked": 1795050939.3423085
+    "checked": 1795054838.9218733
   },
   "health": {},
   "season": {
