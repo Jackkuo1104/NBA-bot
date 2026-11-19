@@ -36,9 +36,9 @@
       "periods": 4
     },
     "401910009": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401910010": {
       "state": "post",
@@ -51,14 +51,14 @@
       "periods": 4
     },
     "401910012": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401910013": {
       "state": "in",
       "status": "STATUS_IN_PROGRESS",
-      "periods": 2
+      "periods": 3
     },
     "401910014": {
       "state": "in",
@@ -68,7 +68,7 @@
     "401910016": {
       "state": "in",
       "status": "STATUS_IN_PROGRESS",
-      "periods": 2
+      "periods": 3
     },
     "401910015": {
       "state": "in",
@@ -386,7 +386,8 @@
     "50519611",
     "50525193",
     "50525196",
-    "50527032"
+    "50527032",
+    "50527047"
   ],
   "awards": [
     "2026:33:4278073:25",
