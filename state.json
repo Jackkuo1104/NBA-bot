@@ -61,14 +61,14 @@
       "periods": 4
     },
     "401910019": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401910020": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401910021": {
       "state": "post",
@@ -76,13 +76,12 @@
       "periods": 4
     },
     "401910022": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     }
   },
   "days_done": [
-    "2026-11-09",
     "2026-11-10",
     "2026-11-11",
     "2026-11-12",
@@ -91,7 +90,8 @@
     "2026-11-15",
     "2026-11-16",
     "2026-11-17",
-    "2026-11-18"
+    "2026-11-18",
+    "2026-11-19"
   ],
   "tx": [
     "2026-10-16|2|Re-signed G Payton Pritchard to a veteran extension.",
