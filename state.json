@@ -463,7 +463,8 @@
     "50464091",
     "50473732",
     "50533303",
-    "50542985"
+    "50542985",
+    "50564924"
   ],
   "honors": [
     "2027:players of the week:October 20–25",
@@ -474,7 +475,7 @@
   "honors_checked": 1795380044.8924441,
   "draft": {
     "year": 2027,
-    "checked": 1795377661.0031285
+    "checked": 1795381528.87603
   },
   "health": {},
   "season": {
@@ -525,6 +526,7 @@
   "shams_tx": {
     "trade|nique clifford": 1794163829.5039964,
     "sign|mason plumlee": 1794447327.0490806,
-    "trade|dejounte murray": 1794599726.4038653
+    "trade|dejounte murray": 1794599726.4038653,
+    "sign|gabe vincent": 1795381526.3260942
   }
 }
