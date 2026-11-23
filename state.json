@@ -43,7 +43,7 @@
     "401910031": {
       "state": "in",
       "status": "STATUS_IN_PROGRESS",
-      "periods": 0
+      "periods": 1
     },
     "401910032": {
       "state": "in",
@@ -52,7 +52,7 @@
     },
     "401910033": {
       "state": "in",
-      "status": "STATUS_END_PERIOD",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 1
     },
     "401910034": {
