@@ -36,9 +36,9 @@
       "periods": 4
     },
     "401910036": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401910037": {
       "state": "post",
@@ -52,17 +52,17 @@
     },
     "401910039": {
       "state": "in",
-      "status": "STATUS_END_PERIOD",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 3
     },
     "401910040": {
       "state": "in",
       "status": "STATUS_IN_PROGRESS",
-      "periods": 2
+      "periods": 3
     },
     "401910041": {
       "state": "in",
-      "status": "STATUS_HALFTIME",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 2
     },
     "401910042": {
