@@ -11,9 +11,9 @@
       "periods": 4
     },
     "401909316": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401909317": {
       "state": "pre",
@@ -62,7 +62,6 @@
     }
   },
   "days_done": [
-    "2026-11-14",
     "2026-11-15",
     "2026-11-16",
     "2026-11-17",
@@ -71,7 +70,8 @@
     "2026-11-20",
     "2026-11-21",
     "2026-11-22",
-    "2026-11-23"
+    "2026-11-23",
+    "2026-11-24"
   ],
   "tx": [
     "2026-10-16|2|Re-signed G Payton Pritchard to a veteran extension.",
@@ -449,7 +449,7 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1795583435.5352263,
+  "awards_checked": 1795585242.3414824,
   "shams": [
     "50176173",
     "50239169",
@@ -481,7 +481,7 @@
     "2027:players of the week:November 9–15",
     "2027:players of the week:November 16–22"
   ],
-  "honors_checked": 1795583436.0730627,
+  "honors_checked": 1795585242.7563672,
   "draft": {
     "year": 2027,
     "checked": 1795584648.0909703
