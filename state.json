@@ -450,7 +450,7 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1795630242.4064033,
+  "awards_checked": 1795632338.0364032,
   "shams": [
     "50176173",
     "50239169",
@@ -473,7 +473,8 @@
     "50473732",
     "50533303",
     "50542985",
-    "50564924"
+    "50564924",
+    "50595534"
   ],
   "honors": [
     "2027:players of the week:October 20–25",
@@ -482,7 +483,7 @@
     "2027:players of the week:November 9–15",
     "2027:players of the week:November 16–22"
   ],
-  "honors_checked": 1795630243.2675538,
+  "honors_checked": 1795632338.7745247,
   "draft": {
     "year": 2027,
     "checked": 1795629648.5418317
@@ -537,6 +538,7 @@
     "trade|nique clifford": 1794163829.5039964,
     "sign|mason plumlee": 1794447327.0490806,
     "trade|dejounte murray": 1794599726.4038653,
-    "sign|gabe vincent": 1795381526.3260942
+    "sign|gabe vincent": 1795381526.3260942,
+    "sign|kevin porter jr": 1795632336.2742288
   }
 }
