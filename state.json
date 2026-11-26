@@ -1,20 +1,5 @@
 {
   "games": {
-    "401909314": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909315": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
-    "401909316": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
-    },
     "401909317": {
       "state": "post",
       "status": "STATUS_FINAL",
@@ -57,8 +42,8 @@
     },
     "401909325": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 2
+      "status": "STATUS_END_PERIOD",
+      "periods": 3
     }
   },
   "days_done": [
