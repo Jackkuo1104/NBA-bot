@@ -1,49 +1,59 @@
 {
   "games": {
-    "401909317": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909326": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909318": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909327": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909319": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909328": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909320": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909329": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909321": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909330": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909322": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909331": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909323": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909332": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909324": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909333": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     },
-    "401909325": {
-      "state": "post",
-      "status": "STATUS_FINAL",
-      "periods": 4
+    "401909334": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909335": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
+    },
+    "401909336": {
+      "state": "pre",
+      "status": "STATUS_SCHEDULED",
+      "periods": 0
     }
   },
   "days_done": [
@@ -443,7 +453,7 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1795753534.841821,
+  "awards_checked": 1795755656.550011,
   "shams": [
     "50176173",
     "50239169",
@@ -476,7 +486,7 @@
     "2027:players of the week:November 9–15",
     "2027:players of the week:November 16–22"
   ],
-  "honors_checked": 1795753850.2843845,
+  "honors_checked": 1795755657.614467,
   "draft": {
     "year": 2027,
     "checked": 1795753239.55729
