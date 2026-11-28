@@ -2,27 +2,27 @@
   "games": {
     "401909326": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 1
+      "status": "STATUS_HALFTIME",
+      "periods": 2
     },
     "401909327": {
       "state": "in",
-      "status": "STATUS_END_PERIOD",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 1
     },
     "401909328": {
       "state": "in",
-      "status": "STATUS_END_PERIOD",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 1
     },
     "401909329": {
       "state": "in",
-      "status": "STATUS_END_PERIOD",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 1
     },
     "401909330": {
-      "state": "pre",
-      "status": "STATUS_SCHEDULED",
+      "state": "in",
+      "status": "STATUS_IN_PROGRESS",
       "periods": 0
     },
     "401909331": {
@@ -495,7 +495,7 @@
   "honors_checked": 1795826740.967635,
   "draft": {
     "year": 2027,
-    "checked": 1795824932.5088453
+    "checked": 1795828533.1209905
   },
   "health": {},
   "season": {
