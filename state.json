@@ -2,8 +2,8 @@
   "games": {
     "401909326": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 0
+      "status": "STATUS_END_PERIOD",
+      "periods": 1
     },
     "401909327": {
       "state": "pre",
