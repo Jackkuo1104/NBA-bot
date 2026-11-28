@@ -6,19 +6,19 @@
       "periods": 4
     },
     "401909327": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401909328": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401909329": {
-      "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 3
+      "state": "post",
+      "status": "STATUS_FINAL",
+      "periods": 4
     },
     "401909330": {
       "state": "in",
@@ -42,8 +42,8 @@
     },
     "401909334": {
       "state": "in",
-      "status": "STATUS_IN_PROGRESS",
-      "periods": 0
+      "status": "STATUS_END_PERIOD",
+      "periods": 1
     },
     "401909335": {
       "state": "in",
@@ -459,7 +459,7 @@
     "2026:297:4278073:25",
     "2026:217:5104157:24"
   ],
-  "awards_checked": 1795832735.8182278,
+  "awards_checked": 1795835133.978698,
   "shams": [
     "50176173",
     "50239169",
@@ -492,7 +492,7 @@
     "2027:players of the week:November 9–15",
     "2027:players of the week:November 16–22"
   ],
-  "honors_checked": 1795832736.9784856,
+  "honors_checked": 1795835134.6835237,
   "draft": {
     "year": 2027,
     "checked": 1795832139.5088174
